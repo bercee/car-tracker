@@ -1,8 +1,13 @@
 # Car Tracker
 
 Car Tracker is a small, single-user application for recording vehicle fuel,
-AdBlue, and general expenses. The repository currently contains the Phase 1
-tooling foundation and compile-only application placeholders.
+AdBlue, and general expenses. The backend currently contains the Phase 2
+SQLite persistence and domain-validation core. HTTP endpoints and the product
+frontend remain intentionally deferred to later approved phases.
+
+All monetary values are whole Hungarian forints. Fuel unit price, AdBlue total
+price, and general expense amount are stored as integer HUF values; fractional
+HUF input is not accepted. Liter quantities retain three-decimal precision.
 
 ## Prerequisites
 
@@ -39,9 +44,12 @@ Run the frontend Vite server in another terminal:
 npm run dev:frontend
 ```
 
-The Phase 1 backend is an exported compile target only. The frontend displays a
-minimal page that proves the React and Vite toolchain works. API, persistence,
-and product UI behavior are intentionally deferred to later approved phases.
+The backend database path is read from `DATABASE_PATH`. It defaults to
+`./data/car.sqlite` relative to the backend working directory during local
+development and `/data/car.sqlite` when `NODE_ENV=production`. The database
+parent directory and schema are created when `openDatabase()` is called. The
+frontend remains the Phase 1 toolchain page until its later implementation
+phase.
 
 ## Quality checks
 

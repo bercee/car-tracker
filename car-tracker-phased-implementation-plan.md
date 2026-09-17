@@ -29,10 +29,10 @@ Fixed implementation choices:
 - Vitest everywhere, Supertest for backend HTTP integration, React Testing Library for component integration.
 - ESLint and Prettier at repository root.
 - ISO calendar dates (`YYYY-MM-DD`) for `eventDate`; UTC timestamps for `createdAt`.
-- Monetary totals are stored as integer cents. Fuel unit prices are stored as integer thousandths of a currency unit, preserving values such as `1.619`.
-- Decimal request/response values are strings to avoid binary floating-point rounding at API boundaries.
+- Every monetary value is denominated in whole Hungarian forints and stored as an integer HUF amount, including fuel unit prices. Fractional HUF values are not accepted.
+- Liter and HUF request/response values are strings so API boundaries never coerce user-entered numeric text through binary floating point.
 - AdBlue `price` means total amount paid, not price per liter.
-- Currency is display configuration, not stored per row. Default: `EUR`; override in the frontend build with `VITE_CURRENCY`.
+- Currency is fixed to `HUF`, is not configurable, and is not stored per row.
 - No application authentication or CORS. Both are unnecessary because Nginx protects one same-origin site.
 
 ## 2. Repository layout
@@ -50,6 +50,10 @@ car-tracker/
 │   │   ├── db.ts
 │   │   ├── schema.sql
 │   │   ├── errors.ts
+│   │   ├── database/
+│   │   │   ├── carDatabase.ts
+│   │   │   ├── mappers.ts
+│   │   │   └── sqliteCarDatabase.ts
 │   │   ├── validation/
 │   │   │   ├── common.ts
 │   │   │   ├── fuel.ts
@@ -172,7 +176,8 @@ CREATE TABLE IF NOT EXISTS fuel (
     DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   odometer_km INTEGER NOT NULL CHECK (odometer_km >= 0),
   liters_milliliters INTEGER NOT NULL CHECK (liters_milliliters > 0),
-  price_per_liter_millis INTEGER NOT NULL CHECK (price_per_liter_millis >= 0),
+  price_per_liter_huf INTEGER NOT NULL
+    CHECK (typeof(price_per_liter_huf) = 'integer' AND price_per_liter_huf >= 0),
   full_tank INTEGER NOT NULL CHECK (full_tank IN (0, 1)),
   remark TEXT CHECK (remark IS NULL OR length(remark) <= 500)
 );
@@ -185,7 +190,8 @@ CREATE TABLE IF NOT EXISTS adblue (
     DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   odometer_km INTEGER NOT NULL CHECK (odometer_km >= 0),
   liters_milliliters INTEGER NOT NULL CHECK (liters_milliliters > 0),
-  price_cents INTEGER NOT NULL CHECK (price_cents >= 0)
+  price_huf INTEGER NOT NULL
+    CHECK (typeof(price_huf) = 'integer' AND price_huf >= 0)
 );
 
 CREATE TABLE IF NOT EXISTS expenses (
@@ -194,7 +200,8 @@ CREATE TABLE IF NOT EXISTS expenses (
     CHECK (event_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
   created_at TEXT NOT NULL
     DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  amount_cents INTEGER NOT NULL CHECK (amount_cents >= 0),
+  amount_huf INTEGER NOT NULL
+    CHECK (typeof(amount_huf) = 'integer' AND amount_huf >= 0),
   notes TEXT CHECK (notes IS NULL OR length(notes) <= 1000)
 );
 
@@ -244,7 +251,7 @@ POST body and response record:
   "eventDate": "2026-09-15",
   "odometerKm": 82450,
   "liters": "47.300",
-  "pricePerLiter": "1.619",
+  "pricePerLiter": "619",
   "fullTank": true,
   "remark": "Shell"
 }
@@ -259,7 +266,7 @@ Response adds:
 }
 ```
 
-Persist `liters` as milliliters and `pricePerLiter` as thousandths. Responses convert the integers back to strings with exactly three fractional digits.
+Persist `liters` as milliliters and `pricePerLiter` as whole HUF. Responses render liters with exactly three fractional digits and the unit price as a whole-number string.
 
 ### AdBlue
 
@@ -268,23 +275,23 @@ Persist `liters` as milliliters and `pricePerLiter` as thousandths. Responses co
   "eventDate": "2026-09-15",
   "odometerKm": 82450,
   "liters": "10.000",
-  "price": "18.90"
+  "price": "7490"
 }
 ```
 
-Persist `liters` as milliliters and total `price` as cents. Responses use three fractional digits for liters and two for price.
+Persist `liters` as milliliters and total `price` as whole HUF. Responses use three fractional digits for liters and a whole-number string for price.
 
 ### Expense
 
 ```json
 {
   "eventDate": "2026-09-15",
-  "amount": "79.99",
+  "amount": "32000",
   "notes": "Annual inspection"
 }
 ```
 
-Persist `amount` as cents. Responses use two fractional digits.
+Persist `amount` as whole HUF. Responses use a whole-number string.
 
 ### Error envelope
 
@@ -308,11 +315,11 @@ Codes: `VALIDATION_ERROR`, `NOT_FOUND`, `UNSUPPORTED_MEDIA_TYPE`, `INTERNAL_ERRO
 - `eventDate`: required string, real calendar date, exact `YYYY-MM-DD`; allow past and future dates because delayed/planned entry policy was not specified.
 - `odometerKm`: integer from `0` through `9,999,999`.
 - Liter strings: canonical decimal syntax, greater than `0`, at most `9999.999`, up to three fractional digits. Reject exponent notation, signs, commas, and extra precision.
-- Money strings: canonical non-negative decimal syntax, at most `9,999,999.99`, up to two fractional digits. Normalize response to two digits.
-- Fuel unit-price strings: non-negative, at most `9999.999`, up to three fractional digits.
+- General and AdBlue HUF strings: canonical non-negative whole-number syntax, at most `9,999,999`. Reject decimals, exponent notation, signs, commas, whitespace, and leading zeros except for `0`.
+- Fuel unit-price HUF strings: canonical non-negative whole-number syntax, at most `9,999`, with the same rejection rules.
 - `fullTank`: Boolean only.
 - Optional text: accept missing, `null`, or string; trim; convert empty string to `null`; enforce limits from schema.
-- Validation conversion must be string-based, not `parseFloat()`. Split on `.`, validate digits, right-pad the fraction, and construct an integer.
+- Validation conversion must be string-based, not `parseFloat()`. For liters, split on `.`, validate digits, right-pad the fraction, and construct milliliters. For HUF, accept digits only and construct the integer amount directly.
 
 Health response:
 
@@ -325,8 +332,11 @@ The health handler executes `SELECT 1` and returns `503` with `{ "status": "unav
 ## 6. Backend module responsibilities
 
 - `config.ts`: read and validate `HOST`, `PORT`, and `DATABASE_PATH`. Defaults: `HOST=0.0.0.0` inside Docker, `PORT=3000`, `DATABASE_PATH=/data/car.sqlite` in production.
-- `db.ts`: open/initialize/close SQLite and expose a narrow database type. Accept the database path as an argument to support tests.
-- `validation/common.ts`: plain-object check, exact-key check, calendar-date parser, integer range validator, decimal-string-to-scaled-integer conversion, optional text normalization.
+- `db.ts`: create the parent directory, open/configure SQLite, execute the schema, and return the database implementation. Accept the database path as an argument to support tests.
+- `database/carDatabase.ts`: narrow persistence interface and database diagnostics shape, independent of SQLite.
+- `database/mappers.ts`: private SQLite row shapes and pure row-to-API record mapping.
+- `database/sqliteCarDatabase.ts`: prepared statements and the SQLite implementation of the persistence interface, including explicit close behavior.
+- `validation/common.ts`: plain-object check, exact-key check, calendar-date parser, integer range validator, liter-string-to-scaled-integer conversion, whole-HUF parser, optional text normalization.
 - Per-record validators: return a discriminated result or throw one typed `ValidationError`; do not depend on Express.
 - Route factories: accept the database instance. Prepare SQL once when the router is created. Use transactions only where more than one statement must be atomic.
 - `app.ts`: create Express app, disable `x-powered-by`, install JSON parsing, register injected routers, add API 404 handler, final error middleware.
@@ -361,7 +371,7 @@ Inputs:
 
 - Dates: `<input type="date">`, default to the user's local current date.
 - Odometer: number input, `min=0`, `max=9999999`, `step=1`.
-- Liters and prices: use text or number inputs with explicit decimal `step`; keep state as strings and submit strings unchanged.
+- Liters use a text or number input with `step=0.001`. HUF prices use text or number inputs with `step=1`. Keep state as strings and submit strings unchanged.
 - Full tank: checkbox.
 - Remarks/notes: textarea with matching `maxLength`.
 
@@ -374,9 +384,8 @@ Inputs:
 
 Formatting:
 
-- `VITE_CURRENCY` defaults to `EUR`.
-- Use `Intl.NumberFormat` for money display after converting trusted API strings to numbers. Keep raw form and API state as strings.
-- Show liters to three decimals and unit price to three decimals; do not silently discard stored precision.
+- Use `Intl.NumberFormat` with currency fixed to `HUF` for money display after converting trusted API strings to numbers. Keep raw form and API state as strings.
+- Show liters to three decimals and every HUF value without fractional digits.
 
 ## 8. Test plan
 
@@ -387,7 +396,8 @@ No Playwright, Cypress, Selenium, or deployed-system E2E tests are required.
 Test pure validation and conversion functions without Express or SQLite:
 
 - Accept valid leap dates; reject impossible dates and malformed formats.
-- Decimal conversions: `1`, `1.6`, `1.619`, `0.001`, maximum boundary.
+- Liter conversions: `1`, `1.6`, `1.619`, `0.001`, maximum boundary.
+- HUF conversions: `0`, `1`, representative and maximum values; reject every fractional form.
 - Reject negative, exponent, comma, whitespace-only, excessive precision, over-maximum, and zero where prohibited.
 - Validate odometer integer and both boundaries.
 - Reject unknown fields, arrays, missing required fields, and wrong Boolean types.
@@ -401,7 +411,7 @@ Run the real Express app, route modules, validation, SQL, and a real temporary S
 For each resource:
 
 - Empty GET returns `200 []`.
-- Valid POST returns `201`, generated ID/timestamp, normalized decimals, and expected fields.
+- Valid POST returns `201`, generated ID/timestamp, canonical liters/HUF strings, and expected fields.
 - Following GET returns the stored record.
 - Multiple records sort by `eventDate DESC`, then `id DESC`.
 - Invalid body returns `400` and writes no row.
@@ -513,8 +523,6 @@ COPY frontend/package.json frontend/package.json
 RUN npm ci
 COPY tsconfig.base.json ./
 COPY frontend frontend
-ARG VITE_CURRENCY=EUR
-ENV VITE_CURRENCY=$VITE_CURRENCY
 RUN npm run build --workspace frontend
 
 FROM nginx:1.29-alpine AS runtime
@@ -880,10 +888,11 @@ Implement:
 
 - `backend/src/schema.sql` exactly as specified in section 4.
 - `backend/src/config.ts` parsing for database-related configuration needed in this phase.
-- `backend/src/db.ts` with parent-directory creation, connection initialization, schema execution, PRAGMAs, prepared statements or narrow data functions, and close behavior.
+- `backend/src/db.ts` with parent-directory creation, connection initialization, and schema execution.
+- A separate narrow database interface, SQLite implementation with prepared statements and close behavior, and pure row-mapping helpers under `backend/src/database/`.
 - Typed domain/request/response shapes for fuel, AdBlue, and expenses.
 - `validation/common.ts` and all three resource validators.
-- Exact string-based decimal conversion and canonical response formatting.
+- Exact string-based liter conversion, whole-HUF parsing, and canonical response formatting.
 - Row-to-API mapping, including SQLite integer Boolean conversion and field-name conversion.
 - Test database helper using a unique temporary directory and real on-disk SQLite file.
 
@@ -894,8 +903,8 @@ Do not implement:
 Unit tests:
 
 - Every validation and conversion case listed under “Backend unit tests” in section 8.
-- Boundaries for dates, odometer, liters, money, unit price, Boolean, optional text, and unknown fields.
-- Database row-to-response mapping and canonical decimal padding.
+- Boundaries for dates, odometer, liters, HUF amounts, unit price, Boolean, optional text, and unknown fields.
+- Database row-to-response mapping, canonical liter padding, and whole-HUF formatting.
 
 Database integration tests:
 
@@ -922,8 +931,8 @@ Coverage: enforce the 80% backend thresholds now. Exclusions are limited to gene
 
 Review focus:
 
-- Storage uses scaled integers, never SQLite `REAL`.
-- API-boundary decimals are parsed without `parseFloat()`.
+- Storage uses integer milliliters for volume and integer HUF for money, never SQLite `REAL`.
+- API-boundary liters and HUF strings are parsed without `parseFloat()`; fractional HUF is rejected.
 - Database ownership and lifecycle are explicit and testable.
 - No HTTP or frontend scope has leaked into this phase.
 
@@ -1007,7 +1016,7 @@ Implement:
 - All loading, empty, success, failure, pending-submit, reset, and refresh behavior from section 7.
 - Semantic labels, keyboard-operable tab buttons, `aria-live` messages, accessible tables, and visible focus states.
 - Responsive CSS with narrow-screen table scrolling.
-- `VITE_CURRENCY` support with `EUR` default.
+- Currency formatting hard-coded to `HUF`, with no currency environment variable or build option.
 - README instructions for frontend development against a local backend. Configure Vite development proxying for `/api` if needed; production requests must stay relative.
 
 Do not implement:
@@ -1052,7 +1061,7 @@ This is manual component/system review, not an automated E2E suite.
 Review focus:
 
 - UI matches the exact approved API contract.
-- Decimal strings and calendar dates are not accidentally rounded or timezone-shifted.
+- Liter/HUF strings and calendar dates are not accidentally rounded or timezone-shifted.
 - Failure never clears user input.
 - The interface remains simple and readable on mobile and desktop.
 
@@ -1161,7 +1170,7 @@ Hard stop: submit the Phase 6 review packet. The implementation is complete only
 ## 16. V1 definition of done
 
 - All three forms create valid records and all three tables display complete datasets newest-event-first.
-- Backend rejects invalid input and never stores floating-point money or volume.
+- Backend rejects invalid input, stores money only as integer HUF, and never stores floating-point money or volume.
 - Event date and creation timestamp remain distinct.
 - Unit and module integration suites pass with at least 80% coverage thresholds.
 - Formatting, lint, strict typecheck, tests, application builds, and Docker builds pass in CI.
