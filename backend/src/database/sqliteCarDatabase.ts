@@ -2,8 +2,7 @@ import type Database from 'better-sqlite3';
 import type { Statement } from 'better-sqlite3';
 
 import type { AdBlueInput, AdBlueRecord, ExpenseInput, ExpenseRecord, FuelInput, FuelRecord } from '../domain.js';
-import { toSafeInteger } from '../validation/common.js';
-import type { CarDatabase, DatabaseDiagnostics } from './carDatabase.js';
+import type { CarDatabase } from './carDatabase.js';
 import { mapAdBlueRow, mapExpenseRow, mapFuelRow, type AdBlueRow, type ExpenseRow, type FuelRow } from './mappers.js';
 
 export class SqliteCarDatabase implements CarDatabase {
@@ -76,18 +75,6 @@ export class SqliteCarDatabase implements CarDatabase {
 
   listExpenses(): ExpenseRecord[] {
     return (this.#listExpenses.all() as ExpenseRow[]).map(mapExpenseRow);
-  }
-
-  diagnostics(): DatabaseDiagnostics {
-    const journal = this.#connection.pragma('journal_mode', { simple: true }) as string;
-    const foreignKeys = this.#connection.pragma('foreign_keys', { simple: true }) as bigint | number;
-    const busyTimeout = this.#connection.pragma('busy_timeout', { simple: true }) as bigint | number;
-
-    return {
-      journalMode: journal,
-      foreignKeys: toSafeInteger(foreignKeys, 'foreign_keys') === 1,
-      busyTimeout: toSafeInteger(busyTimeout, 'busy_timeout'),
-    };
   }
 
   close(): void {

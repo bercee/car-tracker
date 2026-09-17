@@ -105,6 +105,8 @@ car-tracker/
 ├── .dockerignore
 ├── .editorconfig
 ├── .gitignore
+├── .npmrc
+├── .nvmrc
 ├── .prettierignore
 ├── eslint.config.js
 ├── package.json
@@ -154,6 +156,8 @@ Hygiene rules:
 - ESLint must fail on warnings in CI.
 - Prettier uses defaults except `singleQuote: true`, `trailingComma: all`.
 - Commit the root `package-lock.json`; use only `npm ci` in CI and Docker builds.
+- Commit `.nvmrc` with Node major `24` and `.npmrc` with `engine-strict=true` so installs fail clearly on unsupported Node versions.
+- Keep npm's project-level `allowScripts` approvals pinned to reviewed package versions and set `strict-allow-scripts=true` so unreviewed dependency scripts fail installation.
 - Never commit `.env`, SQLite files, WAL/SHM files, coverage, `dist`, or `node_modules`.
 - No `any` unless isolated at an untyped library boundary and justified by a comment.
 
@@ -333,7 +337,7 @@ The health handler executes `SELECT 1` and returns `503` with `{ "status": "unav
 
 - `config.ts`: read and validate `HOST`, `PORT`, and `DATABASE_PATH`. Defaults: `HOST=0.0.0.0` inside Docker, `PORT=3000`, `DATABASE_PATH=/data/car.sqlite` in production.
 - `db.ts`: create the parent directory, open/configure SQLite, execute the schema, and return the database implementation. Accept the database path as an argument to support tests.
-- `database/carDatabase.ts`: narrow persistence interface and database diagnostics shape, independent of SQLite.
+- `database/carDatabase.ts`: narrow persistence interface independent of SQLite.
 - `database/mappers.ts`: private SQLite row shapes and pure row-to-API record mapping.
 - `database/sqliteCarDatabase.ts`: prepared statements and the SQLite implementation of the persistence interface, including explicit close behavior.
 - `validation/common.ts`: plain-object check, exact-key check, calendar-date parser, integer range validator, liter-string-to-scaled-integer conversion, whole-HUF parser, optional text normalization.
@@ -841,6 +845,7 @@ Goal: establish a reproducible, strict monorepo in which both applications can c
 Implement:
 
 - Root npm-workspaces structure for `backend` and `frontend`.
+- `.nvmrc` and strict npm engine/install-script policy in `.npmrc`.
 - Root and workspace `package.json` files with the scripts from section 3.
 - One committed root `package-lock.json`, produced by the selected Node/npm versions.
 - Root `tsconfig.base.json` plus workspace TypeScript configurations.

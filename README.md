@@ -14,6 +14,10 @@ HUF input is not accepted. Liter quantities retain three-decimal precision.
 - Node.js 24 LTS (the Phase 1 lockfile was produced with Node.js 24.20.0)
 - npm 11 (the Phase 1 lockfile was produced with npm 11.19.0)
 
+Run `nvm use` from the repository root when using nvm. npm installations fail
+on Node versions below 24, and unreviewed dependency install scripts are
+rejected.
+
 ## Install
 
 Install the exact dependency versions recorded in the root lockfile:

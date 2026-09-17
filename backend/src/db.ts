@@ -7,7 +7,7 @@ import Database from 'better-sqlite3';
 import type { CarDatabase } from './database/carDatabase.js';
 import { SqliteCarDatabase } from './database/sqliteCarDatabase.js';
 
-export type { CarDatabase, DatabaseDiagnostics } from './database/carDatabase.js';
+export type { CarDatabase } from './database/carDatabase.js';
 
 const schemaPath = fileURLToPath(new URL('./schema.sql', import.meta.url));
 

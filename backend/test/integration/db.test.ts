@@ -1,4 +1,6 @@
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 import SqliteDatabase from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -15,15 +17,47 @@ describe('SQLite persistence', () => {
     testDatabase = undefined;
   });
 
-  it('creates a nested database path and enables required pragmas', () => {
+  it('creates a nested database path', () => {
     testDatabase = createTestDatabase();
 
     expect(existsSync(testDatabase.databasePath)).toBe(true);
-    expect(testDatabase.database.diagnostics()).toEqual({
-      journalMode: 'wal',
-      foreignKeys: true,
-      busyTimeout: 5000,
-    });
+  });
+
+  it('explicitly enables WAL, foreign keys, and a 5000 ms busy timeout', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'car-tracker-pragmas-'));
+    const databasePath = path.join(directory, 'pragma-test.sqlite');
+    const connection = new SqliteDatabase(databasePath, { timeout: 1 });
+
+    try {
+      connection.pragma('foreign_keys = OFF');
+      expect(connection.pragma('foreign_keys', { simple: true })).toBe(0);
+      expect(connection.pragma('busy_timeout', { simple: true })).toBe(1);
+
+      connection.exec(readFileSync(new URL('../../src/schema.sql', import.meta.url), 'utf8'));
+
+      expect({
+        journalMode: connection.pragma('journal_mode', { simple: true }),
+        foreignKeys: connection.pragma('foreign_keys', { simple: true }) === 1,
+        busyTimeout: connection.pragma('busy_timeout', { simple: true }),
+      }).toEqual({
+        journalMode: 'wal',
+        foreignKeys: true,
+        busyTimeout: 5000,
+      });
+
+      connection.exec(`
+        CREATE TABLE pragma_parent (id INTEGER PRIMARY KEY);
+        CREATE TABLE pragma_child (
+          parent_id INTEGER NOT NULL REFERENCES pragma_parent(id)
+        );
+      `);
+      expect(() => connection.prepare('INSERT INTO pragma_child (parent_id) VALUES (?)').run(1)).toThrow(
+        /FOREIGN KEY constraint failed/,
+      );
+    } finally {
+      connection.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it('initializes the schema idempotently', () => {
