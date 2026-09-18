@@ -7,6 +7,7 @@ import { mapAdBlueRow, mapExpenseRow, mapFuelRow, type AdBlueRow, type ExpenseRo
 
 export class SqliteCarDatabase implements CarDatabase {
   readonly #connection: Database.Database;
+  readonly #checkHealth: Statement;
   readonly #insertFuel: Statement;
   readonly #selectFuelById: Statement<[bigint | number]>;
   readonly #listFuel: Statement;
@@ -19,6 +20,7 @@ export class SqliteCarDatabase implements CarDatabase {
 
   constructor(connection: Database.Database) {
     this.#connection = connection;
+    this.#checkHealth = connection.prepare('SELECT 1');
     this.#insertFuel = connection.prepare(`
       INSERT INTO fuel (
         event_date, odometer_km, liters_milliliters, price_per_liter_huf, full_tank, remark
@@ -38,6 +40,10 @@ export class SqliteCarDatabase implements CarDatabase {
     `);
     this.#selectExpenseById = connection.prepare('SELECT * FROM expenses WHERE id = ?');
     this.#listExpenses = connection.prepare('SELECT * FROM expenses ORDER BY event_date DESC, id DESC');
+  }
+
+  checkHealth(): void {
+    this.#checkHealth.get();
   }
 
   addFuel(input: FuelInput): FuelRecord {

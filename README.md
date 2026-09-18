@@ -1,9 +1,9 @@
 # Car Tracker
 
 Car Tracker is a small, single-user application for recording vehicle fuel,
-AdBlue, and general expenses. The backend currently contains the Phase 2
-SQLite persistence and domain-validation core. HTTP endpoints and the product
-frontend remain intentionally deferred to later approved phases.
+AdBlue, and general expenses. The backend provides the Phase 3 JSON API backed
+by SQLite. The product frontend remains intentionally deferred to its later
+approved phase.
 
 All monetary values are whole Hungarian forints. Fuel unit price, AdBlue total
 price, and general expense amount are stored as integer HUF values; fractional
@@ -48,12 +48,50 @@ Run the frontend Vite server in another terminal:
 npm run dev:frontend
 ```
 
-The backend database path is read from `DATABASE_PATH`. It defaults to
-`./data/car.sqlite` relative to the backend working directory during local
-development and `/data/car.sqlite` when `NODE_ENV=production`. The database
-parent directory and schema are created when `openDatabase()` is called. The
-frontend remains the Phase 1 toolchain page until its later implementation
+The frontend remains the Phase 1 toolchain page until its later implementation
 phase.
+
+### Backend environment
+
+The backend accepts these environment variables:
+
+- `HOST`: listen address; defaults to `0.0.0.0`.
+- `PORT`: integer from `1` through `65535`; defaults to `3000`.
+- `DATABASE_PATH`: SQLite file path. It defaults to `./data/car.sqlite`
+  relative to the backend working directory during local development and
+  `/data/car.sqlite` when `NODE_ENV=production`.
+
+The database parent directory and idempotent schema are created at startup.
+For a disposable local API, run from the repository root:
+
+```bash
+DATABASE_PATH=/tmp/car-tracker-dev.sqlite npm run dev:backend
+```
+
+The V1 endpoints are:
+
+```text
+GET  /api/health
+GET  /api/fuel
+POST /api/fuel
+GET  /api/adblue
+POST /api/adblue
+GET  /api/expenses
+POST /api/expenses
+```
+
+For example:
+
+```bash
+curl http://127.0.0.1:3000/api/health
+curl http://127.0.0.1:3000/api/fuel
+curl -X POST http://127.0.0.1:3000/api/fuel \
+  -H 'Content-Type: application/json' \
+  -d '{"eventDate":"2026-09-17","odometerKm":82450,"liters":"47.300","pricePerLiter":"619","fullTank":true,"remark":"Shell"}'
+```
+
+Press `Ctrl+C` to close the HTTP server and SQLite connection. Remove the
+disposable database and its `-wal`/`-shm` files after testing.
 
 ## Quality checks
 
