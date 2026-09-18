@@ -48,8 +48,9 @@ Run the frontend Vite server in another terminal:
 npm run dev:frontend
 ```
 
-The frontend remains the Phase 1 toolchain page until its later implementation
-phase.
+Vite proxies relative `/api` requests to `http://localhost:3000` during local
+development. Start the backend first (optionally with a disposable
+`DATABASE_PATH`), then open the Vite URL shown in the frontend terminal.
 
 ### Backend environment
 
