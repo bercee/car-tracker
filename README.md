@@ -1,9 +1,9 @@
 # Car Tracker
 
 Car Tracker is a small, single-user application for recording vehicle fuel,
-AdBlue, and general expenses. The backend provides the Phase 3 JSON API backed
-by SQLite. The product frontend remains intentionally deferred to its later
-approved phase.
+AdBlue, and general expenses. It has a React frontend and an Express JSON API
+backed by SQLite. The repository is organized as npm workspaces for shared
+`@car-tracker/contracts`, the backend, and the frontend.
 
 All monetary values are whole Hungarian forints. Fuel and AdBlue total prices,
 and general expense amounts are stored as integer HUF values; fractional
