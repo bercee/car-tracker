@@ -1,7 +1,7 @@
 import { addFuel, getFuel } from '../api';
 import { formatDate, formatLiters, formatMoney, today } from '../format';
 import { isHuf, validateCommon } from '../validation';
-import type { FuelRecord, FuelRequest } from '../types';
+import type { FuelRecord, FuelRequest } from '@car-tracker/contracts';
 import { Panel } from './Panel';
 import { RecordTable, type RecordTableColumn } from './RecordTable';
 

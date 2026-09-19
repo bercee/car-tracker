@@ -1,16 +1,9 @@
 import type { ErrorRequestHandler } from 'express';
+import type { ErrorCode, ErrorEnvelope } from '@car-tracker/contracts';
 
 import { ValidationError } from './validation/common.js';
 
-export type ErrorCode = 'VALIDATION_ERROR' | 'NOT_FOUND' | 'UNSUPPORTED_MEDIA_TYPE' | 'INTERNAL_ERROR';
-
-export interface ErrorEnvelope {
-  error: {
-    code: ErrorCode;
-    message: string;
-    field?: string;
-  };
-}
+export type { ErrorCode, ErrorEnvelope } from '@car-tracker/contracts';
 
 export class HttpError extends Error {
   readonly status: number;

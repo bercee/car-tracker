@@ -35,4 +35,12 @@ describe('api client', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
     await expect(getFuel()).rejects.toEqual(new ApiError('Unable to reach the server. Please try again.'));
   });
+
+  it('uses safe fallbacks for malformed responses and incomplete error envelopes', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not JSON', { status: 200 })));
+    await expect(getFuel()).rejects.toEqual(new ApiError('The server returned an invalid response.'));
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: {} }), { status: 400 })));
+    await expect(getFuel()).rejects.toEqual(new ApiError('The request could not be completed.'));
+  });
 });

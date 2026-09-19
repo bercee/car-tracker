@@ -1,7 +1,7 @@
 import { addExpense, getExpenses } from '../api';
 import { formatDate, formatMoney, today } from '../format';
 import { isHuf } from '../validation';
-import type { ExpenseRecord, ExpenseRequest } from '../types';
+import type { ExpenseRecord, ExpenseRequest } from '@car-tracker/contracts';
 import { Panel } from './Panel';
 import { RecordTable, type RecordTableColumn } from './RecordTable';
 

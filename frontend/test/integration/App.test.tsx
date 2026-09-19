@@ -1,17 +1,23 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const api = vi.hoisted(() => ({
-  getFuel: vi.fn(),
-  addFuel: vi.fn(),
-  getAdBlue: vi.fn(),
-  addAdBlue: vi.fn(),
-  getExpenses: vi.fn(),
-  addExpense: vi.fn(),
-}));
-vi.mock('../../src/api', () => ({ ...api, ApiError: class ApiError extends Error {} }));
+const api = vi.hoisted(() => {
+  class ApiError extends Error {}
+
+  return {
+    ApiError,
+    getFuel: vi.fn(),
+    addFuel: vi.fn(),
+    getAdBlue: vi.fn(),
+    addAdBlue: vi.fn(),
+    getExpenses: vi.fn(),
+    addExpense: vi.fn(),
+  };
+});
+vi.mock('../../src/api', () => api);
 import { App } from '../../src/App';
+
 const defaults = () => {
   api.getFuel.mockResolvedValue([]);
   api.getAdBlue.mockResolvedValue([]);
@@ -22,6 +28,8 @@ const defaults = () => {
 };
 
 describe('App', () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it('defaults to Fuel and provides accessible tabs', async () => {
     defaults();
     render(<App />);
@@ -42,16 +50,31 @@ describe('App', () => {
         fullTank: true,
         remark: null,
       },
+      {
+        id: 2,
+        eventDate: '2026-09-17',
+        odometerKm: 2,
+        liters: '2.000',
+        pricePerLiter: '620',
+        fullTank: false,
+        remark: 'Station',
+      },
     ]);
     api.getAdBlue.mockResolvedValue([{ id: 1, eventDate: '2026-09-18', odometerKm: 2, liters: '2.000', price: '500' }]);
-    api.getExpenses.mockResolvedValue([{ id: 1, eventDate: '2026-09-18', amount: '1000', notes: 'Service' }]);
+    api.getExpenses.mockResolvedValue([
+      { id: 1, eventDate: '2026-09-18', amount: '1000', notes: 'Service' },
+      { id: 2, eventDate: '2026-09-17', amount: '500', notes: null },
+    ]);
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('Yes');
+    expect(screen.getByText('No')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'AdBlue' }));
-    await screen.findByText('2.000 L');
+    await screen.findAllByText('2.000 L');
     await user.click(screen.getByRole('tab', { name: 'Expenses' }));
     await screen.findByText('Service');
+    expect(screen.getAllByText('—')).toHaveLength(2);
     await user.click(screen.getByRole('tab', { name: 'Fuel' }));
     expect(api.getFuel).toHaveBeenCalledTimes(1);
   });
@@ -65,6 +88,31 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Save record' }));
     expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('up to three decimal');
     expect(api.addFuel).not.toHaveBeenCalled();
+  });
+
+  it('validates whole-HUF prices and amounts for every panel', async () => {
+    defaults();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+
+    await user.type(screen.getByLabelText('Liters'), '1');
+    await user.type(screen.getByLabelText('Price per liter (HUF)'), '619.5');
+    await user.click(screen.getByRole('button', { name: 'Save record' }));
+    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF price');
+
+    await user.click(screen.getByRole('tab', { name: 'AdBlue' }));
+    await screen.findByLabelText('Total price (HUF)');
+    await user.type(screen.getAllByLabelText('Liters').at(-1)!, '1');
+    await user.type(screen.getByLabelText('Total price (HUF)'), '500.5');
+    await user.click(screen.getByRole('button', { name: 'Save record' }));
+    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF amount');
+
+    await user.click(screen.getByRole('tab', { name: 'Expenses' }));
+    await screen.findByLabelText('Amount (HUF)');
+    await user.type(screen.getByLabelText('Amount (HUF)'), '100.5');
+    await user.click(screen.getByRole('button', { name: 'Save record' }));
+    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF amount');
   });
   it('submits fuel and refreshes', async () => {
     defaults();
@@ -101,6 +149,21 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Save record' }));
     expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('Unable to save');
     expect(screen.getByLabelText('Amount (HUF)')).toHaveValue('1000');
+  });
+
+  it('shows API failures and load fallbacks', async () => {
+    defaults();
+    api.getFuel.mockRejectedValue('offline');
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText('Could not load records.')).toBeInTheDocument();
+
+    api.addExpense.mockRejectedValue(new api.ApiError('Amount was rejected.'));
+    await user.click(screen.getByRole('tab', { name: 'Expenses' }));
+    await screen.findByLabelText('Amount (HUF)');
+    await user.type(screen.getByLabelText('Amount (HUF)'), '1000');
+    await user.click(screen.getByRole('button', { name: 'Save record' }));
+    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('Amount was rejected.');
   });
   it('submits AdBlue and Expenses values', async () => {
     defaults();

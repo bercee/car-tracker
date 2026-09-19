@@ -1072,9 +1072,46 @@ Review focus:
 
 Hard stop: submit the Phase 4 review packet and wait for approval.
 
-### Phase 5: production containers and reverse-proxy deployment files
+### Post–Phase 4 refactor: shared API contracts workspace
 
 Prerequisite: Phase 4 explicitly approved.
+
+Goal: eliminate duplicated API-contract types while preserving the approved HTTP behavior and keeping persistence concerns in the backend.
+
+Implement:
+
+- Add a TypeScript-only `contracts/` npm workspace named `@car-tracker/contracts`, with no runtime dependencies.
+- Export the type-only `src/index.ts` source entry point so Vite and `tsx` consume the workspace directly during development and builds.
+- Move the wire-level API contracts into that workspace: fuel, AdBlue, and expense request and record types; `ErrorCode`; and `ErrorEnvelope`.
+- Make frontend and backend declare `@car-tracker/contracts` as a workspace dependency and import the shared contracts from the package.
+- Remove the now-duplicated contract definitions from `frontend/src/types.ts` and `backend/src/domain.ts`.
+- Keep backend-only storage and validation types in `backend/src/domain.ts`, including milliliters/HUF integer inputs and persistence-facing concepts.
+- Preserve the exact public API shape and error-code values; this refactor must not alter endpoint behavior or UI behavior.
+- Ensure later Docker build stages include the contracts source before building a dependent workspace.
+
+Required gate:
+
+```bash
+npm run format:check
+npm run lint
+npm run typecheck
+npm test
+npm run test:coverage
+npm run build
+```
+
+Review focus:
+
+- The shared workspace is the single source of truth for API wire types.
+- `ErrorEnvelope` uses the same closed `ErrorCode` union in both consumers.
+- Backend-only database representation types have not leaked into the frontend.
+- Package resolution works from workspace source in local development, tests, production builds, and Docker builds.
+
+Hard stop: submit the shared-contracts refactor review packet and wait for approval.
+
+### Phase 5: production containers and reverse-proxy deployment files
+
+Prerequisite: the shared API contracts refactor explicitly approved.
 
 Goal: package the approved applications into two minimal production containers and supply safe home-server deployment configuration.
 

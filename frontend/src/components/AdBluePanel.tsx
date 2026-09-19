@@ -1,7 +1,7 @@
 import { addAdBlue, getAdBlue } from '../api';
 import { formatDate, formatLiters, formatMoney, today } from '../format';
 import { isHuf, validateCommon } from '../validation';
-import type { AdBlueRecord, AdBlueRequest } from '../types';
+import type { AdBlueRecord, AdBlueRequest } from '@car-tracker/contracts';
 import { Panel } from './Panel';
 import { RecordTable, type RecordTableColumn } from './RecordTable';
 

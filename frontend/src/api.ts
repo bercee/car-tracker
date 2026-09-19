@@ -6,7 +6,7 @@ import type {
   ExpenseRequest,
   FuelRecord,
   FuelRequest,
-} from './types';
+} from '@car-tracker/contracts';
 
 export class ApiError extends Error {
   constructor(

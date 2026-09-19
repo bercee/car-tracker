@@ -14,6 +14,7 @@
     "node": ">=24"
   },
   "dependencies": {
+    "@car-tracker/contracts": "*",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
