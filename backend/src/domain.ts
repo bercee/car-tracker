@@ -11,7 +11,7 @@ export interface FuelInput {
   eventDate: string;
   odometerKm: number;
   litersMilliliters: number;
-  pricePerLiterHuf: number;
+  priceHuf: number;
   fullTank: boolean;
   remark: string | null;
 }

@@ -12,12 +12,12 @@ describe('api client', () => {
       expect.objectContaining({ headers: { Accept: 'application/json' } }),
     );
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ id: 1 }), { status: 201 }));
-    await addFuel({ eventDate: '2026-09-18', odometerKm: 1, liters: '1', pricePerLiter: '1', fullTank: false });
+    await addFuel({ eventDate: '2026-09-18', odometerKm: 1, liters: '1', price: '1', fullTank: false });
     expect(fetchMock).toHaveBeenLastCalledWith(
       '/api/fuel',
       expect.objectContaining({
         method: 'POST',
-        body: expect.stringContaining('pricePerLiter'),
+        body: expect.stringContaining('price'),
         headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
       }),
     );

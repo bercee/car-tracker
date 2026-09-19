@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS fuel (
     DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   odometer_km INTEGER NOT NULL CHECK (odometer_km >= 0),
   liters_milliliters INTEGER NOT NULL CHECK (liters_milliliters > 0),
-  price_per_liter_huf INTEGER NOT NULL
-    CHECK (typeof(price_per_liter_huf) = 'integer' AND price_per_liter_huf >= 0),
+  price_huf INTEGER NOT NULL
+    CHECK (typeof(price_huf) = 'integer' AND price_huf >= 0),
   full_tank INTEGER NOT NULL CHECK (full_tank IN (0, 1)),
   remark TEXT CHECK (remark IS NULL OR length(remark) <= 500)
 );

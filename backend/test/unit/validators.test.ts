@@ -8,7 +8,7 @@ const validFuel = {
   eventDate: '2026-09-15',
   odometerKm: 82_450,
   liters: '47.300',
-  pricePerLiter: '619',
+  price: '29284',
   fullTank: true,
   remark: ' Shell ',
 };
@@ -19,7 +19,7 @@ describe('fuel validation', () => {
       eventDate: '2026-09-15',
       odometerKm: 82_450,
       litersMilliliters: 47_300,
-      pricePerLiterHuf: 619,
+      priceHuf: 29_284,
       fullTank: true,
       remark: 'Shell',
     });
@@ -30,19 +30,19 @@ describe('fuel validation', () => {
       eventDate: validFuel.eventDate,
       odometerKm: validFuel.odometerKm,
       liters: validFuel.liters,
-      pricePerLiter: validFuel.pricePerLiter,
+      price: validFuel.price,
       fullTank: validFuel.fullTank,
     };
     expect(validateFuelRequest(withoutRemark).remark).toBeNull();
     expect(validateFuelRequest({ ...validFuel, remark: ' ' }).remark).toBeNull();
   });
 
-  it('accepts unit-price and remark boundaries', () => {
-    expect(validateFuelRequest({ ...validFuel, pricePerLiter: '0', remark: 'x'.repeat(500) })).toMatchObject({
-      pricePerLiterHuf: 0,
+  it('accepts total-price and remark boundaries', () => {
+    expect(validateFuelRequest({ ...validFuel, price: '0', remark: 'x'.repeat(500) })).toMatchObject({
+      priceHuf: 0,
       remark: 'x'.repeat(500),
     });
-    expect(validateFuelRequest({ ...validFuel, pricePerLiter: '9999' }).pricePerLiterHuf).toBe(9_999);
+    expect(validateFuelRequest({ ...validFuel, price: '9999999' }).priceHuf).toBe(9_999_999);
   });
 
   it.each([
@@ -50,9 +50,9 @@ describe('fuel validation', () => {
     [{ ...validFuel, fullTank: 1 }, 'fullTank must be a boolean'],
     [{ ...validFuel, odometerKm: -1 }, 'odometerKm must be an integer'],
     [{ ...validFuel, liters: '0' }, 'liters must be greater than 0'],
-    [{ ...validFuel, pricePerLiter: '-1' }, 'pricePerLiter must be a canonical whole-number HUF amount'],
-    [{ ...validFuel, pricePerLiter: '619.5' }, 'pricePerLiter must be a canonical whole-number HUF amount'],
-    [{ ...validFuel, pricePerLiter: '10000' }, 'pricePerLiter exceeds the maximum allowed value'],
+    [{ ...validFuel, price: '-1' }, 'price must be a canonical whole-number HUF amount'],
+    [{ ...validFuel, price: '29284.5' }, 'price must be a canonical whole-number HUF amount'],
+    [{ ...validFuel, price: '10000000' }, 'price exceeds the maximum allowed value'],
     [{ ...validFuel, remark: 'x'.repeat(501) }, 'remark must be at most 500 characters'],
   ])('rejects invalid fuel input', (input, message) => {
     expect(() => validateFuelRequest(input)).toThrow(message);
@@ -62,7 +62,7 @@ describe('fuel validation', () => {
     const missingLiters = {
       eventDate: validFuel.eventDate,
       odometerKm: validFuel.odometerKm,
-      pricePerLiter: validFuel.pricePerLiter,
+      price: validFuel.price,
       fullTank: validFuel.fullTank,
       remark: validFuel.remark,
     };

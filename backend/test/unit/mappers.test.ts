@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { mapAdBlueRow, mapExpenseRow, mapFuelRow } from '../../src/database/mappers.js';
 
 describe('database row mappers', () => {
-  it('maps a fuel row with a whole-HUF unit price', () => {
+  it('maps a fuel row with a whole-HUF total price', () => {
     expect(
       mapFuelRow({
         id: 42n,
@@ -11,7 +11,7 @@ describe('database row mappers', () => {
         created_at: '2026-09-16T12:34:56.789Z',
         odometer_km: 82_450n,
         liters_milliliters: 47_300n,
-        price_per_liter_huf: 619n,
+        price_huf: 29_284n,
         full_tank: 1n,
         remark: 'Shell',
       }),
@@ -21,7 +21,7 @@ describe('database row mappers', () => {
       createdAt: '2026-09-16T12:34:56.789Z',
       odometerKm: 82_450,
       liters: '47.300',
-      pricePerLiter: '619',
+      price: '29284',
       fullTank: true,
       remark: 'Shell',
     });
@@ -34,7 +34,7 @@ describe('database row mappers', () => {
       created_at: '2026-09-16T12:34:56.789Z',
       odometer_km: 1,
       liters_milliliters: 1,
-      price_per_liter_huf: 0,
+      price_huf: 0,
       full_tank: 0,
       remark: null,
     };

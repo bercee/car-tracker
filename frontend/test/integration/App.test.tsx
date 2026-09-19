@@ -46,7 +46,7 @@ describe('App', () => {
         eventDate: '2026-09-18',
         odometerKm: 1,
         liters: '1.000',
-        pricePerLiter: '619',
+        price: '619',
         fullTank: true,
         remark: null,
       },
@@ -55,7 +55,7 @@ describe('App', () => {
         eventDate: '2026-09-17',
         odometerKm: 2,
         liters: '2.000',
-        pricePerLiter: '620',
+        price: '620',
         fullTank: false,
         remark: 'Station',
       },
@@ -84,7 +84,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('No records yet.');
     await user.type(screen.getByLabelText('Liters'), '1.9999');
-    await user.type(screen.getByLabelText('Price per liter (HUF)'), '619');
+    await user.type(screen.getByLabelText('Total price (HUF)'), '619');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
     expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('up to three decimal');
     expect(api.addFuel).not.toHaveBeenCalled();
@@ -97,14 +97,14 @@ describe('App', () => {
     await screen.findByText('No records yet.');
 
     await user.type(screen.getByLabelText('Liters'), '1');
-    await user.type(screen.getByLabelText('Price per liter (HUF)'), '619.5');
+    await user.type(screen.getByLabelText('Total price (HUF)'), '619.5');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
-    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF price');
+    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF amount');
 
     await user.click(screen.getByRole('tab', { name: 'AdBlue' }));
-    await screen.findByLabelText('Total price (HUF)');
+    await screen.findAllByLabelText('Total price (HUF)');
     await user.type(screen.getAllByLabelText('Liters').at(-1)!, '1');
-    await user.type(screen.getByLabelText('Total price (HUF)'), '500.5');
+    await user.type(screen.getAllByLabelText('Total price (HUF)').at(-1)!, '500.5');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
     expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF amount');
 
@@ -127,12 +127,12 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('No records yet.');
     await user.type(screen.getByLabelText('Liters'), '47.300');
-    await user.type(screen.getByLabelText('Price per liter (HUF)'), '619');
+    await user.type(screen.getByLabelText('Total price (HUF)'), '29284');
     await user.click(screen.getByLabelText('Full tank'));
     await user.type(screen.getByLabelText('Remark'), 'Shell');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
     expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
-    expect(api.addFuel).toHaveBeenCalledWith(expect.objectContaining({ liters: '47.300', pricePerLiter: '619' }));
+    expect(api.addFuel).toHaveBeenCalledWith(expect.objectContaining({ liters: '47.300', price: '29284' }));
     resolve?.();
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Fuel record saved.'));
     expect(screen.getByLabelText('Liters')).toHaveValue('');
@@ -171,9 +171,9 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('No records yet.');
     await user.click(screen.getByRole('tab', { name: 'AdBlue' }));
-    await screen.findByLabelText('Total price (HUF)');
+    await screen.findAllByLabelText('Total price (HUF)');
     await user.type(screen.getAllByLabelText('Liters').at(-1)!, '2.5');
-    await user.type(screen.getByLabelText('Total price (HUF)'), '500');
+    await user.type(screen.getAllByLabelText('Total price (HUF)').at(-1)!, '500');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
     await waitFor(() => expect(api.addAdBlue).toHaveBeenCalled());
     await user.click(screen.getByRole('tab', { name: 'Expenses' }));

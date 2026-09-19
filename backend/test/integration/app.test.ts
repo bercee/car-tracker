@@ -46,7 +46,7 @@ describe('Express API', () => {
       eventDate: '2026-09-15',
       odometerKm: 82_450,
       liters: '47.3',
-      pricePerLiter: '619',
+      price: '29284',
       fullTank: true,
       remark: ' Shell ',
     });
@@ -58,7 +58,7 @@ describe('Express API', () => {
       eventDate: '2026-09-15',
       odometerKm: 82_450,
       liters: '47.300',
-      pricePerLiter: '619',
+      price: '29284',
       fullTank: true,
       remark: 'Shell',
     });
@@ -123,7 +123,7 @@ describe('Express API', () => {
           eventDate,
           odometerKm: index,
           liters: '1',
-          pricePerLiter: '600',
+          price: '600',
           fullTank: false,
         })
         .expect(201);

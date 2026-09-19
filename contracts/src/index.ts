@@ -2,7 +2,7 @@ export interface FuelRequest {
   eventDate: string;
   odometerKm: number;
   liters: string;
-  pricePerLiter: string;
+  price: string;
   fullTank: boolean;
   remark?: string | null;
 }

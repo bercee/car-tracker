@@ -29,9 +29,9 @@ Fixed implementation choices:
 - Vitest everywhere, Supertest for backend HTTP integration, React Testing Library for component integration.
 - ESLint and Prettier at repository root.
 - ISO calendar dates (`YYYY-MM-DD`) for `eventDate`; UTC timestamps for `createdAt`.
-- Every monetary value is denominated in whole Hungarian forints and stored as an integer HUF amount, including fuel unit prices. Fractional HUF values are not accepted.
+- Every monetary value is denominated in whole Hungarian forints and stored as an integer HUF amount. Fuel and AdBlue prices are total amounts paid. Fractional HUF values are not accepted.
 - Liter and HUF request/response values are strings so API boundaries never coerce user-entered numeric text through binary floating point.
-- AdBlue `price` means total amount paid, not price per liter.
+- Fuel and AdBlue `price` mean the total amount paid.
 - Currency is fixed to `HUF`, is not configurable, and is not stored per row.
 - No application authentication or CORS. Both are unnecessary because Nginx protects one same-origin site.
 
@@ -180,8 +180,8 @@ CREATE TABLE IF NOT EXISTS fuel (
     DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   odometer_km INTEGER NOT NULL CHECK (odometer_km >= 0),
   liters_milliliters INTEGER NOT NULL CHECK (liters_milliliters > 0),
-  price_per_liter_huf INTEGER NOT NULL
-    CHECK (typeof(price_per_liter_huf) = 'integer' AND price_per_liter_huf >= 0),
+  price_huf INTEGER NOT NULL
+    CHECK (typeof(price_huf) = 'integer' AND price_huf >= 0),
   full_tank INTEGER NOT NULL CHECK (full_tank IN (0, 1)),
   remark TEXT CHECK (remark IS NULL OR length(remark) <= 500)
 );
@@ -255,7 +255,7 @@ POST body and response record:
   "eventDate": "2026-09-15",
   "odometerKm": 82450,
   "liters": "47.300",
-  "pricePerLiter": "619",
+  "price": "29284",
   "fullTank": true,
   "remark": "Shell"
 }
@@ -270,7 +270,7 @@ Response adds:
 }
 ```
 
-Persist `liters` as milliliters and `pricePerLiter` as whole HUF. Responses render liters with exactly three fractional digits and the unit price as a whole-number string.
+Persist `liters` as milliliters and total `price` as whole HUF. Responses render liters with exactly three fractional digits and the total price as a whole-number string.
 
 ### AdBlue
 
@@ -319,8 +319,7 @@ Codes: `VALIDATION_ERROR`, `NOT_FOUND`, `UNSUPPORTED_MEDIA_TYPE`, `INTERNAL_ERRO
 - `eventDate`: required string, real calendar date, exact `YYYY-MM-DD`; allow past and future dates because delayed/planned entry policy was not specified.
 - `odometerKm`: integer from `0` through `9,999,999`.
 - Liter strings: canonical decimal syntax, greater than `0`, at most `9999.999`, up to three fractional digits. Reject exponent notation, signs, commas, and extra precision.
-- General and AdBlue HUF strings: canonical non-negative whole-number syntax, at most `9,999,999`. Reject decimals, exponent notation, signs, commas, whitespace, and leading zeros except for `0`.
-- Fuel unit-price HUF strings: canonical non-negative whole-number syntax, at most `9,999`, with the same rejection rules.
+- HUF strings: canonical non-negative whole-number syntax, at most `9,999,999`. Reject decimals, exponent notation, signs, commas, whitespace, and leading zeros except for `0`.
 - `fullTank`: Boolean only.
 - Optional text: accept missing, `null`, or string; trim; convert empty string to `null`; enforce limits from schema.
 - Validation conversion must be string-based, not `parseFloat()`. For liters, split on `.`, validate digits, right-pad the fraction, and construct milliliters. For HUF, accept digits only and construct the integer amount directly.
@@ -908,7 +907,7 @@ Do not implement:
 Unit tests:
 
 - Every validation and conversion case listed under “Backend unit tests” in section 8.
-- Boundaries for dates, odometer, liters, HUF amounts, unit price, Boolean, optional text, and unknown fields.
+- Boundaries for dates, odometer, liters, HUF amounts, Boolean, optional text, and unknown fields.
 - Database row-to-response mapping, canonical liter padding, and whole-HUF formatting.
 
 Database integration tests:

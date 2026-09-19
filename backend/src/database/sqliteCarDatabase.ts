@@ -23,7 +23,7 @@ export class SqliteCarDatabase implements CarDatabase {
     this.#checkHealth = connection.prepare('SELECT 1');
     this.#insertFuel = connection.prepare(`
       INSERT INTO fuel (
-        event_date, odometer_km, liters_milliliters, price_per_liter_huf, full_tank, remark
+        event_date, odometer_km, liters_milliliters, price_huf, full_tank, remark
       ) VALUES (?, ?, ?, ?, ?, ?)
     `);
     this.#selectFuelById = connection.prepare('SELECT * FROM fuel WHERE id = ?');
@@ -51,7 +51,7 @@ export class SqliteCarDatabase implements CarDatabase {
       input.eventDate,
       input.odometerKm,
       input.litersMilliliters,
-      input.pricePerLiterHuf,
+      input.priceHuf,
       input.fullTank ? 1 : 0,
       input.remark,
     );

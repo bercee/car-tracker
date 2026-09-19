@@ -7,7 +7,7 @@ export interface FuelRow {
   created_at: string;
   odometer_km: bigint | number;
   liters_milliliters: bigint | number;
-  price_per_liter_huf: bigint | number;
+  price_huf: bigint | number;
   full_tank: bigint | number;
   remark: string | null;
 }
@@ -41,7 +41,7 @@ export function mapFuelRow(row: FuelRow): FuelRecord {
     createdAt: row.created_at,
     odometerKm: toSafeInteger(row.odometer_km, 'odometer_km'),
     liters: formatScaledInteger(row.liters_milliliters, 3),
-    pricePerLiter: formatHufAmount(row.price_per_liter_huf),
+    price: formatHufAmount(row.price_huf),
     fullTank: fullTank === 1,
     remark: row.remark,
   };

@@ -9,7 +9,7 @@ const initial = (): FuelRequest => ({
   eventDate: today(),
   odometerKm: 0,
   liters: '',
-  pricePerLiter: '',
+  price: '',
   fullTank: true,
   remark: '',
 });
@@ -17,7 +17,7 @@ const columns: RecordTableColumn<FuelRecord>[] = [
   { header: 'Date', render: (record) => formatDate(record.eventDate) },
   { header: 'Odometer', render: (record) => record.odometerKm.toLocaleString() },
   { header: 'Liters', render: (record) => formatLiters(record.liters) },
-  { header: 'Price/L', render: (record) => formatMoney(record.pricePerLiter) },
+  { header: 'Total price', render: (record) => formatMoney(record.price) },
   { header: 'Full tank', render: (record) => (record.fullTank ? 'Yes' : 'No') },
   { header: 'Remark', render: (record) => record.remark ?? '—' },
 ];
@@ -31,7 +31,7 @@ export function FuelPanel() {
       initial={initial}
       validate={(v) =>
         validateCommon(v.eventDate, String(v.odometerKm), v.liters) ??
-        (!isHuf(v.pricePerLiter) ? 'Enter a whole HUF price.' : undefined)
+        (!isHuf(v.price) ? 'Enter a whole HUF amount.' : undefined)
       }
       table={(records) => <RecordTable records={records} columns={columns} />}
     >
@@ -69,12 +69,12 @@ export function FuelPanel() {
             />
           </label>
           <label>
-            Price per liter (HUF)
+            Total price (HUF)
             <input
               type="text"
               inputMode="numeric"
-              value={v.pricePerLiter}
-              onChange={(e) => set({ ...v, pricePerLiter: e.target.value })}
+              value={v.price}
+              onChange={(e) => set({ ...v, price: e.target.value })}
               required
             />
           </label>

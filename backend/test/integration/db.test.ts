@@ -77,7 +77,7 @@ describe('SQLite persistence', () => {
       eventDate: '2026-09-15',
       odometerKm: 82_450,
       litersMilliliters: 47_300,
-      pricePerLiterHuf: 619,
+      priceHuf: 29_284,
       fullTank: true,
       remark: 'Shell',
     });
@@ -98,7 +98,7 @@ describe('SQLite persistence', () => {
       eventDate: '2026-09-15',
       odometerKm: 82_450,
       liters: '47.300',
-      pricePerLiter: '619',
+      price: '29284',
       fullTank: true,
       remark: 'Shell',
     });
@@ -120,7 +120,7 @@ describe('SQLite persistence', () => {
       eventDate: '2026-01-01',
       odometerKm: 1,
       litersMilliliters: 1000,
-      pricePerLiterHuf: 600,
+      priceHuf: 600,
       fullTank: false,
       remark: null,
     });
@@ -128,7 +128,7 @@ describe('SQLite persistence', () => {
       eventDate: '2026-02-01',
       odometerKm: 2,
       litersMilliliters: 2000,
-      pricePerLiterHuf: 610,
+      priceHuf: 610,
       fullTank: true,
       remark: null,
     });
@@ -136,7 +136,7 @@ describe('SQLite persistence', () => {
       eventDate: '2026-02-01',
       odometerKm: 3,
       litersMilliliters: 3000,
-      pricePerLiterHuf: 620,
+      priceHuf: 620,
       fullTank: true,
       remark: null,
     });
@@ -171,7 +171,7 @@ describe('SQLite persistence', () => {
 
     const insertFuel = connection.prepare(
       `INSERT INTO fuel
-        (event_date, odometer_km, liters_milliliters, price_per_liter_huf, full_tank, remark)
+        (event_date, odometer_km, liters_milliliters, price_huf, full_tank, remark)
        VALUES (?, ?, ?, ?, ?, ?)`,
     );
     expect(() => insertFuel.run('invalid', 1, 1000, 1000, 1, null)).toThrow();

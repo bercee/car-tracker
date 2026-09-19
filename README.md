@@ -5,8 +5,8 @@ AdBlue, and general expenses. The backend provides the Phase 3 JSON API backed
 by SQLite. The product frontend remains intentionally deferred to its later
 approved phase.
 
-All monetary values are whole Hungarian forints. Fuel unit price, AdBlue total
-price, and general expense amount are stored as integer HUF values; fractional
+All monetary values are whole Hungarian forints. Fuel and AdBlue total prices,
+and general expense amounts are stored as integer HUF values; fractional
 HUF input is not accepted. Liter quantities retain three-decimal precision.
 
 ## Prerequisites
@@ -88,7 +88,7 @@ curl http://127.0.0.1:3000/api/health
 curl http://127.0.0.1:3000/api/fuel
 curl -X POST http://127.0.0.1:3000/api/fuel \
   -H 'Content-Type: application/json' \
-  -d '{"eventDate":"2026-09-17","odometerKm":82450,"liters":"47.300","pricePerLiter":"619","fullTank":true,"remark":"Shell"}'
+  -d '{"eventDate":"2026-09-17","odometerKm":82450,"liters":"47.300","price":"29284","fullTank":true,"remark":"Shell"}'
 ```
 
 Press `Ctrl+C` to close the HTTP server and SQLite connection. Remove the
