@@ -1,8 +1,10 @@
-import type { ErrorRequestHandler } from 'express';
+import type { ErrorHandler } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { ErrorCode, ErrorEnvelope } from '@car-tracker/contracts';
+import { ZodError } from 'zod';
 
-import { ValidationError } from './validation/common.js';
-
+export { errorEnvelopeSchema } from '@car-tracker/contracts';
 export type { ErrorCode, ErrorEnvelope } from '@car-tracker/contracts';
 
 export class HttpError extends Error {
@@ -24,16 +26,22 @@ export function toHttpError(error: unknown): HttpError {
     return error;
   }
 
-  if (error instanceof ValidationError) {
-    return new HttpError(400, 'VALIDATION_ERROR', error.message, error.field);
+  if (error instanceof ZodError) {
+    const issue = error.issues[0];
+    return new HttpError(
+      400,
+      'VALIDATION_ERROR',
+      issue?.message ?? 'Request validation failed',
+      issue?.path.map(String).join('.') || 'body',
+    );
   }
 
-  if (isBodyParserError(error, 413, 'entity.too.large')) {
-    return new HttpError(413, 'VALIDATION_ERROR', 'request body must not exceed 16 KB', 'body');
-  }
-
-  if (isBodyParserError(error, 400, 'entity.parse.failed')) {
+  if (error instanceof HTTPException && error.status === 400 && error.message === 'Malformed JSON in request body') {
     return new HttpError(400, 'VALIDATION_ERROR', 'body must contain valid JSON', 'body');
+  }
+
+  if (error instanceof HTTPException && error.status === 415) {
+    return new HttpError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be application/json');
   }
 
   return new HttpError(500, 'INTERNAL_ERROR', 'An internal error occurred');
@@ -49,24 +57,14 @@ export function toErrorEnvelope(error: HttpError): ErrorEnvelope {
   };
 }
 
-export function createErrorHandler(logger: Pick<Console, 'error'> = console): ErrorRequestHandler {
-  return (error: unknown, request, response, next) => {
-    void request;
-    void next;
+export function createErrorHandler(logger: Pick<Console, 'error'> = console): ErrorHandler {
+  return (error, context) => {
     const httpError = toHttpError(error);
 
     if (httpError.status >= 500) {
       logger.error('Unhandled request error', error);
     }
 
-    response.status(httpError.status).json(toErrorEnvelope(httpError));
+    return context.json(toErrorEnvelope(httpError), httpError.status as ContentfulStatusCode);
   };
-}
-
-function isBodyParserError(error: unknown, status: number, type: string): boolean {
-  if (error === null || typeof error !== 'object') {
-    return false;
-  }
-
-  return Reflect.get(error, 'status') === status && Reflect.get(error, 'type') === type;
 }
