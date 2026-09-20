@@ -1,0 +1,44 @@
+name: car-tracker-local
+
+services:
+  frontend:
+    image: car-tracker-frontend:local
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    networks:
+      app:
+        aliases:
+          - car-tracker-frontend
+
+  backend:
+    image: car-tracker-backend:local
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: '3000'
+      DATABASE_PATH: /data/car.sqlite
+    volumes:
+      - backend-data:/data
+    networks:
+      app:
+        aliases:
+          - car-tracker-backend
+
+  proxy:
+    image: nginx:1.30.5-alpine-slim
+    ports:
+      - '127.0.0.1:8080:80'
+    volumes:
+      - ./reverse-proxy.local.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - app
+
+networks:
+  app:
+
+volumes:
+  backend-data:

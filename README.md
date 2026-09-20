@@ -119,3 +119,101 @@ Implementation follows `car-tracker-phased-implementation-plan.md`. Each phase
 includes its code, tests, documentation, and acceptance checks. After a phase's
 review packet is submitted, work stops until that phase is explicitly approved;
 later-phase code must not be scaffolded early.
+
+## Production containers
+
+The production images target `linux/amd64`, matching the home server. They are
+built from the repository root so the shared contracts workspace is available
+to both build stages:
+
+```bash
+docker build -f backend/Dockerfile -t car-tracker-backend:test .
+docker build -f frontend/Dockerfile -t car-tracker-frontend:test .
+```
+
+The backend image contains compiled JavaScript and production dependencies
+only, runs as the built-in numeric `node` user (UID/GID `1000`), and persists
+SQLite data at `/data/car.sqlite`. The frontend image is static Nginx content.
+
+### Home-server Compose setup
+
+Do this in a new deployment directory, outside the Git checkout if preferred:
+
+```bash
+mkdir -p car-tracker-deploy/data
+cp deploy/compose.example.yml car-tracker-deploy/compose.yml
+cp deploy/.env.example car-tracker-deploy/.env
+docker network create reverse-proxy
+```
+
+Replace `OWNER` in `compose.yml` with the lowercase GitHub owner. Set
+`APP_VERSION` in `.env` to an immutable `sha-<full commit SHA>` image tag after
+publication. The `reverse-proxy` network is external: attach the existing TLS
+reverse-proxy container to it separately. Neither application service publishes
+a host port.
+
+The bind mount must be writable by the backend's runtime user and must not be
+world-writable:
+
+```bash
+chown 1000:1000 car-tracker-deploy/data
+chmod 750 car-tracker-deploy/data
+```
+
+Confirm the UID/GID before setup with:
+
+```bash
+docker run --rm --entrypoint id car-tracker-backend:test
+```
+
+From the deployment directory, validate the generated configuration and start
+the containers:
+
+```bash
+docker compose config
+docker compose pull
+docker compose up -d
+docker compose ps
+```
+
+Copy `deploy/reverse-proxy.example.conf` into the existing TLS proxy's managed
+configuration, replacing the example hostname and retaining that proxy's
+certificate directives. Basic Auth and TLS stay exclusively in that outer
+proxy. Validate its configuration with `nginx -t` before any separately
+approved reload. The `/api/` `proxy_pass` has no URI suffix, preserving request
+paths such as `/api/fuel`.
+
+For local teardown of this example deployment, run `docker compose down` from
+the deployment directory. This removes containers but retains `./data` and its
+SQLite database. Remove that directory manually only when the data is no longer
+needed.
+
+### Local production-stack test
+
+`deploy/compose.local.yml` builds both application images from this checkout
+and runs a local HTTP-only Nginx proxy. It does not use GHCR, your external
+proxy network, TLS, or Basic Auth. Only the proxy binds a host port, and it is
+limited to `127.0.0.1:8080`.
+
+```bash
+docker compose -f deploy/compose.local.yml up --build
+```
+
+Open `http://127.0.0.1:8080` or check the complete proxy path with:
+
+```bash
+curl http://127.0.0.1:8080/api/health
+```
+
+The test database is a Docker-managed named volume and survives normal
+teardown. Stop the stack while retaining it with:
+
+```bash
+docker compose -f deploy/compose.local.yml down
+```
+
+Remove the disposable database too with:
+
+```bash
+docker compose -f deploy/compose.local.yml down -v
+```

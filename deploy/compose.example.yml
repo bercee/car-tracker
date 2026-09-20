@@ -1,0 +1,42 @@
+name: car-tracker
+
+services:
+  frontend:
+    image: ghcr.io/OWNER/car-tracker-frontend:${APP_VERSION:-main}
+    restart: unless-stopped
+    networks:
+      proxy:
+        aliases:
+          - car-tracker-frontend
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    expose:
+      - '80'
+    security_opt:
+      - no-new-privileges:true
+
+  backend:
+    image: ghcr.io/OWNER/car-tracker-backend:${APP_VERSION:-main}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: '3000'
+      DATABASE_PATH: /data/car.sqlite
+    volumes:
+      - ./data:/data
+    networks:
+      proxy:
+        aliases:
+          - car-tracker-backend
+    expose:
+      - '3000'
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  proxy:
+    external: true
+    name: reverse-proxy
