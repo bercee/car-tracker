@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import type { CarDatabase } from '../database/carDatabase.js';
+import type { CarDatabase } from '../database/index.js';
 
 export function createHealthRouter(database: Pick<CarDatabase, 'checkHealth'>): Router {
   const router = Router();

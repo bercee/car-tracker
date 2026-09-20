@@ -1,7 +1,6 @@
 import { Router } from 'express';
 
-import type { CarDatabase } from '../database/carDatabase.js';
-import { validateExpenseRequest } from '../validation/expense.js';
+import type { CarDatabase } from '../database/index.js';
 
 export function createExpensesRouter(database: CarDatabase): Router {
   const router = Router();
@@ -11,8 +10,7 @@ export function createExpensesRouter(database: CarDatabase): Router {
   });
 
   router.post('/', (request, response) => {
-    const input = validateExpenseRequest(request.body);
-    response.status(201).json(database.addExpense(input));
+    response.status(201).json(database.addExpense(request.body));
   });
 
   return router;

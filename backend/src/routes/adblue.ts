@@ -1,7 +1,6 @@
 import { Router } from 'express';
 
-import type { CarDatabase } from '../database/carDatabase.js';
-import { validateAdBlueRequest } from '../validation/adblue.js';
+import type { CarDatabase } from '../database/index.js';
 
 export function createAdBlueRouter(database: CarDatabase): Router {
   const router = Router();
@@ -11,8 +10,7 @@ export function createAdBlueRouter(database: CarDatabase): Router {
   });
 
   router.post('/', (request, response) => {
-    const input = validateAdBlueRequest(request.body);
-    response.status(201).json(database.addAdBlue(input));
+    response.status(201).json(database.addAdBlue(request.body));
   });
 
   return router;

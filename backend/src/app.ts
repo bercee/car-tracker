@@ -1,6 +1,6 @@
 import express, { type RequestHandler } from 'express';
 
-import type { CarDatabase } from './database/carDatabase.js';
+import type { CarDatabase } from './database/index.js';
 import { createErrorHandler, HttpError, toErrorEnvelope } from './errors.js';
 import { createAdBlueRouter } from './routes/adblue.js';
 import { createExpensesRouter } from './routes/expenses.js';

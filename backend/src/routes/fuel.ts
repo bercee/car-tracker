@@ -1,7 +1,6 @@
 import { Router } from 'express';
 
-import type { CarDatabase } from '../database/carDatabase.js';
-import { validateFuelRequest } from '../validation/fuel.js';
+import type { CarDatabase } from '../database/index.js';
 
 export function createFuelRouter(database: CarDatabase): Router {
   const router = Router();
@@ -11,8 +10,7 @@ export function createFuelRouter(database: CarDatabase): Router {
   });
 
   router.post('/', (request, response) => {
-    const input = validateFuelRequest(request.body);
-    response.status(201).json(database.addFuel(input));
+    response.status(201).json(database.addFuel(request.body));
   });
 
   return router;

@@ -1,6 +1,6 @@
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
-import { openDatabase } from './db.js';
+import { openDatabase } from './database/index.js';
 import { createShutdownCoordinator } from './shutdown.js';
 
 try {
