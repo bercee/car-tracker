@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 
 import Database from 'better-sqlite3';
@@ -32,7 +32,11 @@ export function openDatabase(databasePath: string): CarDatabase {
   connection.pragma('busy_timeout = 5000');
 
   const database = drizzle(connection, { schema });
-  migrate(database, { migrationsFolder: path.resolve(import.meta.dirname, '../drizzle') });
+  const bundledMigrationsFolder = path.resolve(import.meta.dirname, '../drizzle');
+  const migrationsFolder = existsSync(path.join(bundledMigrationsFolder, 'meta/_journal.json'))
+    ? bundledMigrationsFolder
+    : path.resolve(import.meta.dirname, '../../drizzle');
+  migrate(database, { migrationsFolder });
 
   return {
     checkHealth: () => {
