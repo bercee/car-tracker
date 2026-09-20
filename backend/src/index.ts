@@ -1,3 +1,5 @@
+import { serve } from '@hono/node-server';
+
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
 import { openDatabase } from './database/index.js';
@@ -7,10 +9,16 @@ try {
   const config = loadConfig();
   const database = openDatabase(config.databasePath);
   const app = createApp(database);
-  const server = app.listen(config.port, config.host);
-  server.once('listening', () => {
-    console.log(`Car Tracker backend listening on http://${config.host}:${config.port}`);
-  });
+  const server = serve(
+    {
+      fetch: app.fetch,
+      hostname: config.host,
+      port: config.port,
+    },
+    () => {
+      console.log(`Car Tracker backend listening on http://${config.host}:${config.port}`);
+    },
+  );
   server.once('error', (error: Error) => {
     console.error('Failed to start Car Tracker backend', error);
     process.exit(1);

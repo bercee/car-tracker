@@ -35,13 +35,17 @@ export function openDatabase(databasePath: string): CarDatabase {
   migrate(database, { migrationsFolder: path.resolve(import.meta.dirname, '../drizzle') });
 
   return {
-    checkHealth: () => { z.literal(1).parse(connection.prepare('SELECT 1').pluck().get()); },
+    checkHealth: () => {
+      z.literal(1).parse(connection.prepare('SELECT 1').pluck().get());
+    },
     addFuel: (value) => addFuel(database, value),
     listFuel: () => listFuel(database),
     addAdBlue: (value) => addAdBlue(database, value),
     listAdBlue: () => listAdBlue(database),
     addExpense: (value) => addExpense(database, value),
     listExpenses: () => listExpenses(database),
-    close: () => { if (connection.open) connection.close(); },
+    close: () => {
+      if (connection.open) connection.close();
+    },
   };
 }

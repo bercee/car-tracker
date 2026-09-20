@@ -4,12 +4,20 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./adblue": "./src/adblue.ts",
+    "./errors": "./src/errors.ts",
+    "./expenses": "./src/expenses.ts",
+    "./fuel": "./src/fuel.ts",
+    "./validation": "./src/validation.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "engines": {
     "node": ">=24"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
   }
 }

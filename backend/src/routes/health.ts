@@ -1,18 +1,30 @@
-import { Router } from 'express';
+import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
+import { z } from 'zod';
 
 import type { CarDatabase } from '../database/index.js';
+import { jsonResponse } from './openapi.js';
 
-export function createHealthRouter(database: Pick<CarDatabase, 'checkHealth'>): Router {
-  const router = Router();
+const healthOkSchema = z.strictObject({ status: z.literal('ok') }).meta({ id: 'HealthOk' });
+const healthUnavailableSchema = z.strictObject({ status: z.literal('unavailable') }).meta({ id: 'HealthUnavailable' });
 
-  router.get('/', (_request, response) => {
+const healthRoute = createRoute({
+  method: 'get',
+  path: '/api/health',
+  tags: ['Health'],
+  summary: 'Check database health',
+  responses: {
+    200: jsonResponse(healthOkSchema, 'The database is available'),
+    503: jsonResponse(healthUnavailableSchema, 'The database is unavailable'),
+  },
+});
+
+export function registerHealthRoute(app: OpenAPIHono, database: Pick<CarDatabase, 'checkHealth'>): void {
+  app.openapi(healthRoute, (context) => {
     try {
       database.checkHealth();
-      response.status(200).json({ status: 'ok' });
+      return context.json({ status: 'ok' as const }, 200);
     } catch {
-      response.status(503).json({ status: 'unavailable' });
+      return context.json({ status: 'unavailable' as const }, 503);
     }
   });
-
-  return router;
 }

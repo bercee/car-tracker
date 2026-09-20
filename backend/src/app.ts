@@ -1,37 +1,41 @@
-import express, { type RequestHandler } from 'express';
+import { swaggerUI } from '@hono/swagger-ui';
+import { OpenAPIHono } from '@hono/zod-openapi';
 
 import type { CarDatabase } from './database/index.js';
 import { createErrorHandler, HttpError, toErrorEnvelope } from './errors.js';
-import { createAdBlueRouter } from './routes/adblue.js';
-import { createExpensesRouter } from './routes/expenses.js';
-import { createFuelRouter } from './routes/fuel.js';
-import { createHealthRouter } from './routes/health.js';
+import { registerAdBlueRoutes } from './routes/adblue.js';
+import { registerExpenseRoutes } from './routes/expenses.js';
+import { registerFuelRoutes } from './routes/fuel.js';
+import { registerHealthRoute } from './routes/health.js';
 
-export function createApp(database: CarDatabase, logger: Pick<Console, 'error'> = console): express.Express {
-  const app = express();
-  app.disable('x-powered-by');
-
-  const limitJsonBodySize = express.json({ limit: '16kb' });
-  app.post(['/api/fuel', '/api/adblue', '/api/expenses'], requireJsonForPost, limitJsonBodySize);
-  app.use('/api/health', createHealthRouter(database));
-  app.use('/api/fuel', createFuelRouter(database));
-  app.use('/api/adblue', createAdBlueRouter(database));
-  app.use('/api/expenses', createExpensesRouter(database));
-
-  app.use('/api', (_request, response) => {
-    const error = new HttpError(404, 'NOT_FOUND', 'API endpoint not found');
-    response.status(error.status).json(toErrorEnvelope(error));
+export function createApp(database: CarDatabase, logger: Pick<Console, 'error'> = console): OpenAPIHono {
+  const app = new OpenAPIHono({
+    strict: false,
+    defaultHook: (result) => {
+      if (!result.success) {
+        throw result.error;
+      }
+    },
   });
 
-  app.use(createErrorHandler(logger));
+  registerHealthRoute(app, database);
+  registerFuelRoutes(app, database);
+  registerAdBlueRoutes(app, database);
+  registerExpenseRoutes(app, database);
+
+  app.doc31('/api/doc', {
+    openapi: '3.1.0',
+    info: {
+      title: 'Car Tracker API',
+      version: '0.1.0',
+    },
+  });
+  app.get('/api/ui', swaggerUI({ url: '/api/doc' }));
+
+  const apiNotFound = new HttpError(404, 'NOT_FOUND', 'API endpoint not found');
+  app.all('/api', (context) => context.json(toErrorEnvelope(apiNotFound), 404));
+  app.all('/api/*', (context) => context.json(toErrorEnvelope(apiNotFound), 404));
+  app.onError(createErrorHandler(logger));
+
   return app;
 }
-
-export const requireJsonForPost: RequestHandler = (request, _response, next) => {
-  if (request.method === 'POST' && request.is('application/json') !== 'application/json') {
-    next(new HttpError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be application/json'));
-    return;
-  }
-
-  next();
-};
