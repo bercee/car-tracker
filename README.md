@@ -217,3 +217,96 @@ Remove the disposable database too with:
 ```bash
 docker compose -f deploy/compose.local.yml down -v
 ```
+
+## CI, GHCR, and releases
+
+GitHub Actions runs formatting, linting, strict type checking, coverage tests,
+application builds, and non-publishing `linux/amd64` Docker builds for every
+pull request and eligible push. Docker publication is manual: use **Run
+workflow** in GitHub Actions to publish a branch, or GitHub CLI/API with a tag
+ref to publish a version tag. Pull requests and ordinary pushes never log in to
+GHCR or publish an image. A manual run on `main` publishes `main` and immutable
+`sha-<full commit SHA>` tags; a manual run on a `v*` tag also publishes the
+matching version and major/minor version tags.
+
+Before the first publication, ensure GitHub Packages is enabled for the
+repository. The workflow labels each image with its source repository; verify
+on the package settings page that each package is linked to this repository and
+inherits its access permissions. Keep both packages private unless a deliberate
+visibility change is approved. The workflow uses its scoped `GITHUB_TOKEN` and
+does not store registry credentials in the repository.
+
+The home server needs Docker credentials with package-read access only. Create a
+classic personal access token with only `read:packages`, then log in
+interactively on the server so the token remains in Docker's credential store
+and never in Compose, `.env`, or source control:
+
+```bash
+docker login ghcr.io
+```
+
+### Release checklist
+
+1. Open a pull request and confirm `verify` and both `images` matrix builds
+   pass. Those builds must report `push: false`.
+2. Review and merge the pull request. In GitHub Actions, choose **Run
+   workflow**, select `main`, and confirm both `publish-images` matrix entries
+   publish `car-tracker-frontend` and `car-tracker-backend` with the same
+   full-SHA tag.
+3. On the home server, pull both exact tags before changing containers:
+
+   ```bash
+   docker pull ghcr.io/OWNER/car-tracker-frontend:sha-<full-commit-sha>
+   docker pull ghcr.io/OWNER/car-tracker-backend:sha-<full-commit-sha>
+   ```
+
+4. Back up the SQLite database before any schema-changing release.
+5. Set `APP_VERSION=sha-<full-commit-sha>` in the deployment directory's
+   private `.env`; never use the mutable `main` tag for a release.
+6. Run `docker compose pull && docker compose up -d`, then inspect
+   `docker compose ps` and `docker compose logs backend`.
+7. Open the authenticated application. Do not create synthetic production rows
+   just to test the deployment.
+
+For a versioned release, push an annotated tag after the commit is on `main`,
+then manually dispatch the workflow against that tag with GitHub CLI:
+
+```bash
+git tag -a v1.0.0 -m 'v1.0.0'
+git push origin v1.0.0
+gh workflow run ci.yml --ref v1.0.0
+```
+
+After its workflow completes, verify that the semantic tags and that commit's
+`sha-<full-commit-sha>` tag resolve to the same image digest for each package.
+
+### Backup, rollback, and troubleshooting
+
+Run SQLite's online backup command on the server; do not copy only a live main
+database file while WAL writes may be active:
+
+```bash
+mkdir -p backups
+sqlite3 ./data/car.sqlite ".backup './backups/car-$(date +%F-%H%M%S).sqlite'"
+```
+
+To roll back, restore the prior immutable SHA in `.env`, then run:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+V1 schema initialization is additive and idempotent, so an ordinary image
+rollback does not require restoring the database. Restore a backup only when a
+future incompatible schema change requires it, and test restoration
+periodically.
+
+If pulls fail, confirm the registry login uses a package-read credential and
+that package visibility/linkage permits the account access. If a container does
+not start, check `docker compose ps`, then `docker compose logs backend` or
+`docker compose logs frontend`; confirm `APP_VERSION` exists for both images
+and that `./data` is owned by the backend runtime UID/GID. If the proxy returns
+an error, validate its configuration with `nginx -t`, confirm all containers are
+on `reverse-proxy`, and check that its `/api/` upstream preserves the `/api`
+prefix. CI never accesses the home server, SSH, Basic Auth material, or SQLite
+data.
