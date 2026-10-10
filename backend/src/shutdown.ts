@@ -1,4 +1,4 @@
-import type { CarDatabase } from './database/carDatabase.js';
+import type { CarDatabase } from './database/index.js';
 
 export interface ClosableServer {
   close(callback: (error?: Error) => void): void;
