@@ -75,10 +75,16 @@ The V1 endpoints are:
 GET  /api/health
 GET  /api/fuel
 POST /api/fuel
+PUT  /api/fuel/:id
+DELETE /api/fuel/:id
 GET  /api/adblue
 POST /api/adblue
+PUT  /api/adblue/:id
+DELETE /api/adblue/:id
 GET  /api/expenses
 POST /api/expenses
+PUT  /api/expenses/:id
+DELETE /api/expenses/:id
 ```
 
 For example:
@@ -89,7 +95,15 @@ curl http://127.0.0.1:3000/api/fuel
 curl -X POST http://127.0.0.1:3000/api/fuel \
   -H 'Content-Type: application/json' \
   -d '{"eventDate":"2026-09-17","odometerKm":82450,"liters":"47.300","price":"29284","fullTank":true,"remark":"Shell"}'
+curl -X PUT http://127.0.0.1:3000/api/fuel/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"eventDate":"2026-09-18","odometerKm":82500,"liters":"46.800","price":"29000","fullTank":true,"remark":"Updated"}'
+curl -i -X DELETE http://127.0.0.1:3000/api/fuel/1
 ```
+
+Successful updates return `200` with the updated record; successful deletes
+return `204` with an empty body. A missing record ID returns the standard JSON
+`404 NOT_FOUND` error envelope. Member IDs must be positive safe integers.
 
 Press `Ctrl+C` to close the HTTP server and SQLite connection. Remove the
 disposable database and its `-wal`/`-shm` files after testing.

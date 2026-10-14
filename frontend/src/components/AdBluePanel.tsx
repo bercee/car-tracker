@@ -1,4 +1,4 @@
-import { addAdBlue, getAdBlue } from '../api';
+import { addAdBlue, deleteAdBlue, getAdBlue, updateAdBlue } from '../api';
 import { formatDate, formatLiters, formatMoney, today } from '../format';
 import { isHuf, validateCommon } from '../validation';
 import type { AdBlueRecord, AdBlueRequest } from '@car-tracker/contracts';
@@ -19,12 +19,17 @@ export function AdBluePanel() {
       title="AdBlue"
       load={getAdBlue}
       submit={addAdBlue}
+      update={updateAdBlue}
+      remove={deleteAdBlue}
+      toFormValue={(r) => ({ eventDate: r.eventDate, odometerKm: r.odometerKm, liters: r.liters, price: r.price })}
       initial={initial}
       validate={(v) =>
         validateCommon(v.eventDate, String(v.odometerKm), v.liters) ??
         (!isHuf(v.price) ? 'Enter a whole HUF amount.' : undefined)
       }
-      table={(records) => <RecordTable records={records} columns={columns} />}
+      table={(records, actions) => (
+        <RecordTable records={records} columns={columns} actions={{ ...actions, label: 'AdBlue' }} />
+      )}
     >
       {(v, set) => (
         <>

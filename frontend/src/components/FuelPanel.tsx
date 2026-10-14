@@ -1,4 +1,4 @@
-import { addFuel, getFuel } from '../api';
+import { addFuel, deleteFuel, getFuel, updateFuel } from '../api';
 import { formatDate, formatLiters, formatMoney, today } from '../format';
 import { isHuf, validateCommon } from '../validation';
 import type { FuelRecord, FuelRequest } from '@car-tracker/contracts';
@@ -28,12 +28,24 @@ export function FuelPanel() {
       title="Fuel"
       load={getFuel}
       submit={addFuel}
+      update={updateFuel}
+      remove={deleteFuel}
+      toFormValue={(r) => ({
+        eventDate: r.eventDate,
+        odometerKm: r.odometerKm,
+        liters: r.liters,
+        price: r.price,
+        fullTank: r.fullTank,
+        remark: r.remark ?? '',
+      })}
       initial={initial}
       validate={(v) =>
         validateCommon(v.eventDate, String(v.odometerKm), v.liters) ??
         (!isHuf(v.price) ? 'Enter a whole HUF amount.' : undefined)
       }
-      table={(records) => <RecordTable records={records} columns={columns} />}
+      table={(records, actions) => (
+        <RecordTable records={records} columns={columns} actions={{ ...actions, label: 'Fuel' }} />
+      )}
     >
       {(v, set) => (
         <>
