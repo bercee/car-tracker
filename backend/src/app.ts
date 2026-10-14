@@ -12,7 +12,15 @@ export function createApp(database: CarDatabase, logger: Pick<Console, 'error'> 
   app.disable('x-powered-by');
 
   const limitJsonBodySize = express.json({ limit: '16kb' });
-  app.post(['/api/fuel', '/api/adblue', '/api/expenses'], requireJsonForPost, limitJsonBodySize);
+  const bodyPaths = [
+    '/api/fuel',
+    '/api/adblue',
+    '/api/expenses',
+    '/api/fuel/:id',
+    '/api/adblue/:id',
+    '/api/expenses/:id',
+  ];
+  app.use(bodyPaths, requireJsonForBody, limitJsonBodySize);
   app.use('/api/health', createHealthRouter(database));
   app.use('/api/fuel', createFuelRouter(database));
   app.use('/api/adblue', createAdBlueRouter(database));
@@ -27,8 +35,11 @@ export function createApp(database: CarDatabase, logger: Pick<Console, 'error'> 
   return app;
 }
 
-export const requireJsonForPost: RequestHandler = (request, _response, next) => {
-  if (request.method === 'POST' && request.is('application/json') !== 'application/json') {
+export const requireJsonForBody: RequestHandler = (request, _response, next) => {
+  if (
+    (request.method === 'POST' || request.method === 'PUT') &&
+    request.is('application/json') !== 'application/json'
+  ) {
     next(new HttpError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be application/json'));
     return;
   }

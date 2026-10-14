@@ -9,10 +9,16 @@ const api = vi.hoisted(() => {
     ApiError,
     getFuel: vi.fn(),
     addFuel: vi.fn(),
+    updateFuel: vi.fn(),
+    deleteFuel: vi.fn(),
     getAdBlue: vi.fn(),
     addAdBlue: vi.fn(),
+    updateAdBlue: vi.fn(),
+    deleteAdBlue: vi.fn(),
     getExpenses: vi.fn(),
     addExpense: vi.fn(),
+    updateExpense: vi.fn(),
+    deleteExpense: vi.fn(),
   };
 });
 vi.mock('../../src/api', () => api);
@@ -23,8 +29,14 @@ const defaults = () => {
   api.getAdBlue.mockResolvedValue([]);
   api.getExpenses.mockResolvedValue([]);
   api.addFuel.mockResolvedValue({});
+  api.updateFuel.mockResolvedValue({});
+  api.deleteFuel.mockResolvedValue(undefined);
   api.addAdBlue.mockResolvedValue({});
+  api.updateAdBlue.mockResolvedValue({});
+  api.deleteAdBlue.mockResolvedValue(undefined);
   api.addExpense.mockResolvedValue({});
+  api.updateExpense.mockResolvedValue({});
+  api.deleteExpense.mockResolvedValue(undefined);
 };
 
 describe('App', () => {
@@ -182,5 +194,90 @@ describe('App', () => {
     await user.type(screen.getByLabelText('Notes'), 'Service');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
     await waitFor(() => expect(api.addExpense).toHaveBeenCalled());
+  });
+
+  it('loads a fuel row into the shared form, updates it, and confirms deletion', async () => {
+    defaults();
+    api.getFuel.mockResolvedValue([
+      {
+        id: 8,
+        eventDate: '2026-09-18',
+        odometerKm: 123,
+        liters: '12.300',
+        price: '4567',
+        fullTank: false,
+        remark: 'Station',
+      },
+    ]);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('button', { name: 'Edit Fuel record 8' });
+    await user.click(screen.getByRole('button', { name: 'Edit Fuel record 8' }));
+    expect(screen.getByRole('group')).toHaveTextContent('Edit fuel record');
+    expect(screen.getByLabelText('Odometer (km)')).toHaveValue(123);
+    expect(screen.getByLabelText('Liters')).toHaveValue('12.300');
+    expect(screen.getByLabelText('Total price (HUF)')).toHaveValue('4567');
+    expect(screen.getByLabelText('Full tank')).not.toBeChecked();
+    expect(screen.getByLabelText('Remark')).toHaveValue('Station');
+    await user.clear(screen.getByLabelText('Remark'));
+    await user.type(screen.getByLabelText('Remark'), 'Updated');
+    await user.click(screen.getByRole('button', { name: 'Update record' }));
+    await waitFor(() => expect(api.updateFuel).toHaveBeenCalledWith(8, expect.objectContaining({ remark: 'Updated' })));
+    expect(await screen.findByRole('status')).toHaveTextContent('Fuel record updated.');
+    expect(screen.getByRole('button', { name: 'Save record' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit Fuel record 8' }));
+    await user.click(screen.getByRole('button', { name: 'Delete Fuel record 8' }));
+    expect(confirm).toHaveBeenCalledWith('Delete this Fuel record? This cannot be undone.');
+    expect(api.deleteFuel).toHaveBeenCalledWith(8);
+    expect(await screen.findByRole('status')).toHaveTextContent('Fuel record deleted.');
+    confirm.mockRestore();
+  });
+
+  it('cancels edits and leaves the row untouched when deletion is declined', async () => {
+    defaults();
+    api.getExpenses.mockResolvedValue([{ id: 3, eventDate: '2026-09-18', amount: '1000', notes: null }]);
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Expenses' }));
+    await screen.findByRole('button', { name: 'Edit Expenses record 3' });
+    await user.click(screen.getByRole('button', { name: 'Edit Expenses record 3' }));
+    expect(screen.getByLabelText('Notes')).toHaveValue('');
+    await user.type(screen.getByLabelText('Notes'), 'draft');
+    await user.click(screen.getByRole('button', { name: 'Cancel edit' }));
+    expect(screen.getByRole('button', { name: 'Save record' })).toBeInTheDocument();
+    expect(api.updateExpense).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Delete Expenses record 3' }));
+    expect(api.deleteExpense).not.toHaveBeenCalled();
+  });
+
+  it('maps AdBlue and expense records into their existing edit forms', async () => {
+    defaults();
+    api.getAdBlue.mockResolvedValue([
+      { id: 2, eventDate: '2026-09-17', odometerKm: 456, liters: '3.400', price: '789', createdAt: '' },
+    ]);
+    api.getExpenses.mockResolvedValue([{ id: 4, eventDate: '2026-09-16', amount: '1200', notes: null, createdAt: '' }]);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('tab', { name: 'AdBlue' }));
+    await user.click(await screen.findByRole('button', { name: 'Edit AdBlue record 2' }));
+    expect(screen.getAllByLabelText('Date').at(-1)).toHaveValue('2026-09-17');
+    expect(screen.getAllByLabelText('Odometer (km)').at(-1)).toHaveValue(456);
+    expect(screen.getAllByLabelText('Liters').at(-1)).toHaveValue('3.400');
+    expect(screen.getAllByLabelText('Total price (HUF)').at(-1)).toHaveValue('789');
+    await user.click(screen.getByRole('button', { name: 'Update record' }));
+    await waitFor(() => expect(api.updateAdBlue).toHaveBeenCalledWith(2, expect.objectContaining({ liters: '3.400' })));
+
+    await user.click(screen.getByRole('tab', { name: 'Expenses' }));
+    await user.click(await screen.findByRole('button', { name: 'Edit Expenses record 4' }));
+    expect(screen.getByLabelText('Notes')).toHaveValue('');
+    expect(screen.getByLabelText('Amount (HUF)')).toHaveValue('1200');
+    api.updateExpense.mockRejectedValueOnce(new api.ApiError('Update rejected.'));
+    await user.click(screen.getByRole('button', { name: 'Update record' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Update rejected.');
+    expect(screen.getByRole('button', { name: 'Update record' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Amount (HUF)')).toHaveValue('1200');
   });
 });

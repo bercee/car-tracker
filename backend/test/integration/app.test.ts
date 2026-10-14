@@ -141,6 +141,62 @@ describe('Express API', () => {
     ]);
   });
 
+  it('updates and deletes every resource and returns field-level member errors', async () => {
+    const app = createApp(testDatabase.database, logger);
+    const specs = [
+      [
+        '/api/fuel',
+        { eventDate: '2026-09-15', odometerKm: 10, liters: '1', price: '100', fullTank: true, remark: 'old' },
+        { eventDate: '2026-09-16', odometerKm: 11, liters: '2', price: '200', fullTank: false, remark: ' new ' },
+      ],
+      [
+        '/api/adblue',
+        { eventDate: '2026-09-15', odometerKm: 10, liters: '1', price: '100' },
+        { eventDate: '2026-09-16', odometerKm: 11, liters: '2', price: '200' },
+      ],
+      [
+        '/api/expenses',
+        { eventDate: '2026-09-15', amount: '100', notes: 'old' },
+        { eventDate: '2026-09-16', amount: '200', notes: ' new ' },
+      ],
+    ] as const;
+    for (const [path, original, changed] of specs) {
+      const created = await request(app).post(path).send(original).expect(201);
+      const updated = await request(app).put(`${path}/${created.body.id}`).send(changed).expect(200);
+      expect(updated.body).toMatchObject({
+        id: created.body.id,
+        createdAt: created.body.createdAt,
+        eventDate: '2026-09-16',
+      });
+      expect((await request(app).get(path)).body).toHaveLength(1);
+      await request(app).delete(`${path}/${created.body.id}`).expect(204, '');
+      expect((await request(app).get(path)).body).toEqual([]);
+      const missing = await request(app).delete(`${path}/999`).expect(404);
+      expect(missing.body.error).toMatchObject({ code: 'NOT_FOUND', field: 'id' });
+    }
+    for (const id of ['abc', '0', '-1', '1.2', '9007199254740992']) {
+      const response = await request(app).delete(`/api/fuel/${id}`).expect(400);
+      expect(response.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field: 'id' });
+      await request(app).put(`/api/fuel/${id}`).send({}).expect(400);
+    }
+  });
+
+  it.each([
+    [
+      '/api/fuel',
+      { eventDate: 'bad' },
+      { eventDate: '2026-09-15', odometerKm: 1, liters: '1', price: '1', fullTank: false },
+    ],
+    ['/api/adblue', [], { eventDate: '2026-09-15', odometerKm: 1, liters: '1', price: '1' }],
+    ['/api/expenses', { eventDate: '2026-09-15', amount: '1.5' }, { eventDate: '2026-09-15', amount: '1' }],
+  ])('rejects invalid PUT bodies without changing %s', async (path, invalid, valid) => {
+    const app = createApp(testDatabase.database, logger);
+    const created = await request(app).post(path).send(valid).expect(201);
+    const rejected = await request(app).put(`${path}/${created.body.id}`).send(invalid).expect(400);
+    expect(rejected.body.error.code).toBe('VALIDATION_ERROR');
+    expect((await request(app).get(path)).body).toEqual([created.body]);
+  });
+
   it.each([
     ['/api/fuel', { eventDate: 'bad' }],
     ['/api/adblue', []],
@@ -167,6 +223,22 @@ describe('Express API', () => {
     expect(missingHeader.status).toBe(415);
   });
 
+  it('requires JSON for PUT and accepts bodyless DELETE without a content type', async () => {
+    const app = createApp(testDatabase.database, logger);
+    const created = await request(app)
+      .post('/api/expenses')
+      .send({ eventDate: '2026-09-17', amount: '10' })
+      .expect(201);
+    await request(app).put(`/api/expenses/${created.body.id}`).expect(415);
+    const updated = await request(app)
+      .put(`/api/expenses/${created.body.id}`)
+      .set('Content-Type', 'application/json')
+      .send('{')
+      .expect(400);
+    expect(updated.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field: 'body' });
+    await request(app).delete(`/api/expenses/${created.body.id}`).expect(204);
+  });
+
   it('returns 404 for an unknown POST before applying resource body rules', async () => {
     const response = await request(createApp(testDatabase.database, logger)).post('/api/unknown');
 
@@ -175,7 +247,8 @@ describe('Express API', () => {
   });
 
   it('returns a standard 413 response for bodies above 16 KB', async () => {
-    const response = await request(createApp(testDatabase.database, logger))
+    const app = createApp(testDatabase.database, logger);
+    const response = await request(app)
       .post('/api/expenses')
       .set('Content-Type', 'application/json')
       .send(JSON.stringify({ eventDate: '2026-09-17', amount: '1', notes: 'x'.repeat(17 * 1024) }));
@@ -188,6 +261,12 @@ describe('Express API', () => {
         field: 'body',
       },
     });
+    const created = await request(app).post('/api/expenses').send({ eventDate: '2026-09-17', amount: '1' }).expect(201);
+    await request(app)
+      .put(`/api/expenses/${created.body.id}`)
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ eventDate: '2026-09-17', amount: '1', notes: 'x'.repeat(17 * 1024) }))
+      .expect(413);
   });
 
   it('returns a standard 400 response for malformed JSON', async () => {

@@ -154,6 +154,83 @@ describe('SQLite persistence', () => {
     expect(database.listExpenses().map(({ id }) => id)).toEqual([3, 2, 1]);
   });
 
+  it('updates and deletes records without changing identity or crossing resources', () => {
+    testDatabase = createTestDatabase();
+    const db = testDatabase.database;
+    const fuel = db.addFuel({
+      eventDate: '2026-01-01',
+      odometerKm: 1,
+      litersMilliliters: 1000,
+      priceHuf: 100,
+      fullTank: false,
+      remark: null,
+    });
+    const otherFuel = db.addFuel({
+      eventDate: '2026-02-01',
+      odometerKm: 2,
+      litersMilliliters: 2000,
+      priceHuf: 200,
+      fullTank: true,
+      remark: null,
+    });
+    const blue = db.addAdBlue({ eventDate: '2026-01-01', odometerKm: 1, litersMilliliters: 1000, priceHuf: 100 });
+    const expense = db.addExpense({ eventDate: '2026-01-01', amountHuf: 100, notes: null });
+    const changedFuel = db.updateFuel(fuel.id, {
+      eventDate: '2026-03-01',
+      odometerKm: 22,
+      litersMilliliters: 22300,
+      priceHuf: 22000,
+      fullTank: true,
+      remark: 'updated',
+    });
+    const changedBlue = db.updateAdBlue(blue.id, {
+      eventDate: '2026-03-02',
+      odometerKm: 23,
+      litersMilliliters: 2300,
+      priceHuf: 2300,
+    });
+    const changedExpense = db.updateExpense(expense.id, { eventDate: '2026-03-03', amountHuf: 300, notes: 'updated' });
+    expect(changedFuel).toMatchObject({
+      id: fuel.id,
+      createdAt: fuel.createdAt,
+      eventDate: '2026-03-01',
+      liters: '22.300',
+      remark: 'updated',
+    });
+    expect(changedBlue).toMatchObject({
+      id: blue.id,
+      createdAt: blue.createdAt,
+      eventDate: '2026-03-02',
+      liters: '2.300',
+    });
+    expect(changedExpense).toMatchObject({
+      id: expense.id,
+      createdAt: expense.createdAt,
+      eventDate: '2026-03-03',
+      amount: '300',
+      notes: 'updated',
+    });
+    expect(db.listFuel().map((row) => row.id)).toEqual([fuel.id, otherFuel.id]);
+    expect(
+      db.updateFuel(999, {
+        eventDate: '2026-03-01',
+        odometerKm: 2,
+        litersMilliliters: 1000,
+        priceHuf: 100,
+        fullTank: false,
+        remark: null,
+      }),
+    ).toBeUndefined();
+    expect(db.deleteFuel(fuel.id)).toBe(true);
+    expect(db.deleteFuel(otherFuel.id)).toBe(true);
+    expect(db.deleteAdBlue(blue.id)).toBe(true);
+    expect(db.deleteExpense(expense.id)).toBe(true);
+    expect(db.deleteFuel(fuel.id)).toBe(false);
+    expect(db.listFuel()).toEqual([]);
+    expect(db.listAdBlue()).toEqual([]);
+    expect(db.listExpenses()).toEqual([]);
+  });
+
   it('preserves records after close and reopen', () => {
     testDatabase = createTestDatabase();
     testDatabase.database.addExpense({ eventDate: '2026-09-17', amountHuf: 5000, notes: null });

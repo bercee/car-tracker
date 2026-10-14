@@ -1,4 +1,4 @@
-import { addExpense, getExpenses } from '../api';
+import { addExpense, deleteExpense, getExpenses, updateExpense } from '../api';
 import { formatDate, formatMoney, today } from '../format';
 import { isHuf } from '../validation';
 import type { ExpenseRecord, ExpenseRequest } from '@car-tracker/contracts';
@@ -18,6 +18,9 @@ export function ExpensesPanel() {
       title="Expenses"
       load={getExpenses}
       submit={addExpense}
+      update={updateExpense}
+      remove={deleteExpense}
+      toFormValue={(r) => ({ eventDate: r.eventDate, amount: r.amount, notes: r.notes ?? '' })}
       initial={initial}
       validate={(v) =>
         !/^\d{4}-\d{2}-\d{2}$/.test(v.eventDate)
@@ -26,7 +29,9 @@ export function ExpensesPanel() {
             ? 'Enter a whole HUF amount.'
             : undefined
       }
-      table={(records) => <RecordTable records={records} columns={columns} />}
+      table={(records, actions) => (
+        <RecordTable records={records} columns={columns} actions={{ ...actions, label: 'Expenses' }} />
+      )}
     >
       {(v, set) => (
         <>
