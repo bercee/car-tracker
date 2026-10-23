@@ -367,4 +367,141 @@ describe('Express API', () => {
     expect(response.text).not.toContain('stack');
     expect(logger.error).toHaveBeenCalledOnce();
   });
+
+  describe('cars', () => {
+    const postCar = (app: ReturnType<typeof createApp>, name: unknown) => request(app).post('/api/cars').send({ name });
+
+    it('returns an empty list on a fresh database', async () => {
+      const fresh = createTestDatabase();
+      try {
+        const response = await request(createApp(fresh.database, logger)).get('/api/cars');
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual([]);
+      } finally {
+        fresh.closeAndRemove();
+      }
+    });
+
+    it('creates a car with a trimmed name and lists cars sorted by name', async () => {
+      const app = createApp(testDatabase.database, logger);
+
+      const created = await postCar(app, '  alpha  ');
+      expect(created.status).toBe(201);
+      expect(created.body).toMatchObject({ name: 'alpha' });
+      expect(created.body.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      await postCar(app, 'Zeta');
+
+      const listed = await request(app).get('/api/cars');
+      expect(listed.status).toBe(200);
+      expect(listed.body.map((car: { name: string }) => car.name)).toEqual(['alpha', 'Test car', 'Zeta']);
+    });
+
+    it('rejects duplicate names, case-insensitively, with 409 CONFLICT', async () => {
+      const app = createApp(testDatabase.database, logger);
+
+      for (const name of ['Test car', 'TEST CAR']) {
+        const response = await postCar(app, name);
+        expect(response.status).toBe(409);
+        expect(response.body).toEqual({
+          error: { code: 'CONFLICT', message: 'A car with this name already exists', field: 'name' },
+        });
+      }
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    it('renames a car without affecting its records', async () => {
+      const app = createApp(testDatabase.database, logger);
+      await request(app)
+        .post(`/api/cars/${carId}/expenses`)
+        .send({ eventDate: '2026-09-17', amount: '15000' })
+        .expect(201);
+      const before = await request(app).get(`/api/cars/${carId}/expenses`);
+      expect(before.body).toHaveLength(1);
+
+      const renamed = await request(app).put(`/api/cars/${carId}`).send({ name: ' Renamed ' });
+      expect(renamed.status).toBe(200);
+      expect(renamed.body).toMatchObject({ id: carId, name: 'Renamed' });
+
+      const after = await request(app).get(`/api/cars/${carId}/expenses`);
+      expect(after.body).toEqual(before.body);
+    });
+
+    it('allows renaming a car to its own name in a different case', async () => {
+      const response = await request(createApp(testDatabase.database, logger))
+        .put(`/api/cars/${carId}`)
+        .send({ name: 'TEST CAR' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.name).toBe('TEST CAR');
+    });
+
+    it("rejects renaming to another car's name with 409", async () => {
+      const app = createApp(testDatabase.database, logger);
+      const other = await postCar(app, 'Other');
+
+      const response = await request(app).put(`/api/cars/${other.body.id}`).send({ name: 'test car' });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toEqual({
+        code: 'CONFLICT',
+        message: 'A car with this name already exists',
+        field: 'name',
+      });
+    });
+
+    it('returns 404 when renaming an unknown car', async () => {
+      const response = await request(createApp(testDatabase.database, logger))
+        .put('/api/cars/999')
+        .send({ name: 'Ghost' });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({
+        error: { code: 'NOT_FOUND', message: 'Car not found', field: 'carId' },
+      });
+    });
+
+    it('returns 400 for an invalid carId on rename', async () => {
+      const response = await request(createApp(testDatabase.database, logger)).put('/api/cars/abc').send({ name: 'X' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field: 'carId' });
+    });
+
+    it('rejects empty and over-long names with 400', async () => {
+      const app = createApp(testDatabase.database, logger);
+
+      for (const name of ['   ', 'x'.repeat(61)]) {
+        const created = await postCar(app, name);
+        expect(created.status).toBe(400);
+        expect(created.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field: 'name' });
+        const renamed = await request(app).put(`/api/cars/${carId}`).send({ name });
+        expect(renamed.status).toBe(400);
+        expect(renamed.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field: 'name' });
+      }
+    });
+
+    it('requires JSON for POST and PUT', async () => {
+      const app = createApp(testDatabase.database, logger);
+
+      const created = await request(app).post('/api/cars').set('Content-Type', 'text/plain').send('name');
+      const renamed = await request(app).put(`/api/cars/${carId}`).set('Content-Type', 'text/plain').send('name');
+
+      expect(created.status).toBe(415);
+      expect(renamed.status).toBe(415);
+      expect(created.body.error.code).toBe('UNSUPPORTED_MEDIA_TYPE');
+      expect(renamed.body.error.code).toBe('UNSUPPORTED_MEDIA_TYPE');
+    });
+
+    it('has no DELETE route and does not shadow nested record routes', async () => {
+      const app = createApp(testDatabase.database, logger);
+
+      const deleted = await request(app).delete(`/api/cars/${carId}`);
+      expect(deleted.status).toBe(404);
+      expect(deleted.body.error.code).toBe('NOT_FOUND');
+
+      const fuel = await request(app).get(`/api/cars/${carId}/fuel`);
+      expect(fuel.status).toBe(200);
+      expect(fuel.body).toEqual([]);
+    });
+  });
 });
