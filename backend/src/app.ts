@@ -4,6 +4,7 @@ import type { CarDatabase } from './database/carDatabase.js';
 import { createErrorHandler, HttpError, toErrorEnvelope } from './errors.js';
 import { createAdBlueRouter } from './routes/adblue.js';
 import { createExpensesRouter } from './routes/expenses.js';
+import { createCarScope } from './routes/carScope.js';
 import { createFuelRouter } from './routes/fuel.js';
 import { createHealthRouter } from './routes/health.js';
 
@@ -11,20 +12,13 @@ export function createApp(database: CarDatabase, logger: Pick<Console, 'error'> 
   const app = express();
   app.disable('x-powered-by');
 
+  const carScope = createCarScope(database);
   const limitJsonBodySize = express.json({ limit: '16kb' });
-  const bodyPaths = [
-    '/api/fuel',
-    '/api/adblue',
-    '/api/expenses',
-    '/api/fuel/:id',
-    '/api/adblue/:id',
-    '/api/expenses/:id',
-  ];
-  app.use(bodyPaths, requireJsonForBody, limitJsonBodySize);
+  app.use('/api/cars', requireJsonForBody, limitJsonBodySize);
   app.use('/api/health', createHealthRouter(database));
-  app.use('/api/fuel', createFuelRouter(database));
-  app.use('/api/adblue', createAdBlueRouter(database));
-  app.use('/api/expenses', createExpensesRouter(database));
+  app.use('/api/cars/:carId/fuel', carScope, createFuelRouter(database));
+  app.use('/api/cars/:carId/adblue', carScope, createAdBlueRouter(database));
+  app.use('/api/cars/:carId/expenses', carScope, createExpensesRouter(database));
 
   app.use('/api', (_request, response) => {
     const error = new HttpError(404, 'NOT_FOUND', 'API endpoint not found');
