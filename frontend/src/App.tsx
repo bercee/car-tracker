@@ -3,6 +3,7 @@ import type { Car } from '@car-tracker/contracts';
 import { getCars } from './api';
 import { pickActiveCar, readStoredCarId, storeCarId } from './carSelection';
 import { AdBluePanel } from './components/AdBluePanel';
+import { CarManager } from './components/CarManager';
 import { ExpensesPanel } from './components/ExpensesPanel';
 import { FuelPanel } from './components/FuelPanel';
 import { StatusMessage } from './components/StatusMessage';
@@ -14,6 +15,14 @@ enum Panel {
 }
 
 const panels = Object.values(Panel);
+
+// Folds only ASCII A-Z, matching SQLite's NOCASE collation used by the backend.
+const foldAscii = (name: string) => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+const byName = (a: Car, b: Car) => {
+  const left = foldAscii(a.name);
+  const right = foldAscii(b.name);
+  return left < right ? -1 : left > right ? 1 : a.id - b.id;
+};
 
 export function App() {
   const [active, setActive] = useState<Panel>(Panel.Fuel);
@@ -46,6 +55,13 @@ export function App() {
   const selectCar = (id: number) => {
     setCarId(id);
     storeCarId(id);
+  };
+  const onAdded = (car: Car) => {
+    setCars((current) => [...current, car].sort(byName));
+    selectCar(car.id);
+  };
+  const onRenamed = (car: Car) => {
+    setCars((current) => current.map((existing) => (existing.id === car.id ? car : existing)).sort(byName));
   };
   const selectPanel = (panel: Panel) => {
     setActive(panel);
@@ -86,10 +102,14 @@ export function App() {
       </main>
     );
   }
+  const manager = (
+    <CarManager activeCar={cars.find((car) => car.id === carId)} onAdded={onAdded} onRenamed={onRenamed} />
+  );
   if (carId === undefined) {
     return (
       <main>
         {header}
+        {manager}
         <p>No cars yet. Add a car to start tracking.</p>
       </main>
     );
@@ -98,6 +118,7 @@ export function App() {
   return (
     <main>
       {header}
+      {manager}
       <nav aria-label="Record types" role="tablist">
         {panels.map((panel) => (
           <button key={panel} role="tab" aria-selected={active === panel} onClick={() => selectPanel(panel)}>

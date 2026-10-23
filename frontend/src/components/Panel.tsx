@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 
 import { ApiError } from '../api';
+import { useIsMounted } from '../useIsMounted';
 import { StatusMessage } from './StatusMessage';
 
 export interface PanelActions<R> {
@@ -20,18 +21,6 @@ export interface PanelProps<T, R extends { id: number }> {
   validate: (value: T) => string | undefined;
   children: (value: T, setValue: (value: T) => void, disabled: boolean) => ReactNode;
   table: (records: R[], actions: PanelActions<R>) => ReactNode;
-}
-
-// True until the component unmounts, so late responses never touch a panel that was switched away.
-function useIsMounted() {
-  const mountedRef = useRef(false);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-  return useCallback(() => mountedRef.current, []);
 }
 
 export function Panel<T, R extends { id: number }>({

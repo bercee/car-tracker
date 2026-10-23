@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,6 +8,8 @@ const api = vi.hoisted(() => {
   return {
     ApiError,
     getCars: vi.fn(),
+    addCar: vi.fn(),
+    renameCar: vi.fn(),
     getFuel: vi.fn(),
     addFuel: vi.fn(),
     updateFuel: vi.fn(),
@@ -38,6 +40,7 @@ const fuelRow = (id: number, remark: string) => ({
   fullTank: true,
   remark,
 });
+const panel = (name: string) => within(screen.getByRole('region', { name }));
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => {
@@ -173,7 +176,7 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
     expect(api.addFuel).toHaveBeenCalledWith(1, expect.objectContaining({ liters: '47.300', price: '29284' }));
     resolve?.();
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Fuel record saved.'));
+    await waitFor(() => expect(panel('Fuel').getByRole('status')).toHaveTextContent('Fuel record saved.'));
     expect(screen.getByLabelText('Liters')).toHaveValue('');
   });
   it('preserves input after a save failure', async () => {
@@ -241,7 +244,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByRole('button', { name: 'Edit Fuel record 8' });
     await user.click(screen.getByRole('button', { name: 'Edit Fuel record 8' }));
-    expect(screen.getByRole('group')).toHaveTextContent('Edit fuel record');
+    expect(panel('Fuel').getByRole('group')).toHaveTextContent('Edit fuel record');
     expect(screen.getByLabelText('Odometer (km)')).toHaveValue(123);
     expect(screen.getByLabelText('Liters')).toHaveValue('12.300');
     expect(screen.getByLabelText('Total price (HUF)')).toHaveValue('4567');
@@ -253,13 +256,13 @@ describe('App', () => {
     await waitFor(() =>
       expect(api.updateFuel).toHaveBeenCalledWith(1, 8, expect.objectContaining({ remark: 'Updated' })),
     );
-    expect(await screen.findByRole('status')).toHaveTextContent('Fuel record updated.');
+    expect(await panel('Fuel').findByRole('status')).toHaveTextContent('Fuel record updated.');
     expect(screen.getByRole('button', { name: 'Save record' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Edit Fuel record 8' }));
     await user.click(screen.getByRole('button', { name: 'Delete Fuel record 8' }));
     expect(confirm).toHaveBeenCalledWith('Delete this Fuel record? This cannot be undone.');
     expect(api.deleteFuel).toHaveBeenCalledWith(1, 8);
-    expect(await screen.findByRole('status')).toHaveTextContent('Fuel record deleted.');
+    expect(await panel('Fuel').findByRole('status')).toHaveTextContent('Fuel record deleted.');
     confirm.mockRestore();
   });
 
@@ -307,7 +310,7 @@ describe('App', () => {
     expect(screen.getByLabelText('Amount (HUF)')).toHaveValue('1200');
     api.updateExpense.mockRejectedValueOnce(new api.ApiError('Update rejected.'));
     await user.click(screen.getByRole('button', { name: 'Update record' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Update rejected.');
+    expect(await panel('Expenses').findByRole('alert')).toHaveTextContent('Update rejected.');
     expect(screen.getByRole('button', { name: 'Update record' })).toBeInTheDocument();
     expect(screen.getByLabelText('Amount (HUF)')).toHaveValue('1200');
   });
@@ -367,10 +370,10 @@ describe('App', () => {
     expect(screen.getByLabelText('Liters')).toHaveValue('');
 
     await user.click(screen.getByRole('button', { name: 'Edit Fuel record 2' }));
-    expect(screen.getByRole('group')).toHaveTextContent('Edit fuel record');
+    expect(panel('Fuel').getByRole('group')).toHaveTextContent('Edit fuel record');
     await user.selectOptions(screen.getByLabelText('Car'), 'Golf');
     await screen.findByText('Remark 1');
-    expect(screen.getByRole('group')).toHaveTextContent('Add fuel record');
+    expect(panel('Fuel').getByRole('group')).toHaveTextContent('Add fuel record');
     expect(screen.getByLabelText('Remark')).toHaveValue('');
   });
   // Covers the key-remount / effect-cancel path; it cannot detect removal of Panel's isMounted guard.
@@ -459,6 +462,100 @@ describe('App', () => {
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Car')).not.toBeInTheDocument();
     expect(api.getFuel).not.toHaveBeenCalled();
+  });
+  it('adds the first car from the empty state and makes it active', async () => {
+    defaults();
+    api.getCars.mockResolvedValue([]);
+    api.addCar.mockResolvedValue({ id: 5, name: 'Octavia', createdAt: '' });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No cars yet. Add a car to start tracking.');
+    expect(screen.queryByRole('button', { name: 'Rename car' })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Name'), '  Octavia ');
+    await user.click(screen.getByRole('button', { name: 'Add car' }));
+    expect(api.addCar).toHaveBeenCalledWith({ name: 'Octavia' });
+    expect(await screen.findByRole('tablist')).toBeInTheDocument();
+    expect(screen.getByLabelText('Car')).toHaveValue('5');
+    await waitFor(() => expect(api.getFuel).toHaveBeenCalledWith(5));
+    expect(window.localStorage.getItem('car-tracker.activeCarId')).toBe('5');
+    expect(screen.queryByText('No cars yet. Add a car to start tracking.')).not.toBeInTheDocument();
+  });
+  it('switches to a newly added car and keeps the list sorted', async () => {
+    defaults();
+    api.addCar.mockResolvedValue({ id: 3, name: 'astra', createdAt: '' });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.type(screen.getByLabelText('Name'), 'astra');
+    await user.click(screen.getByRole('button', { name: 'Add car' }));
+    expect(await screen.findByText('Car added.')).toBeInTheDocument();
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['astra', 'Golf', 'Polo']);
+    expect(screen.getByLabelText('Car')).toHaveValue('3');
+    expect(screen.getByLabelText('Name')).toHaveValue('');
+    await waitFor(() => expect(api.getFuel).toHaveBeenCalledWith(3));
+    expect(window.localStorage.getItem('car-tracker.activeCarId')).toBe('3');
+  });
+  it('shows the server error for a duplicate car name and leaves the list unchanged', async () => {
+    defaults();
+    api.addCar.mockRejectedValue(new api.ApiError('A car with this name already exists.'));
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.type(screen.getByLabelText('Name'), 'Golf');
+    await user.click(screen.getByRole('button', { name: 'Add car' }));
+    expect(await screen.findByText('A car with this name already exists.')).toBeInTheDocument();
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Golf', 'Polo']);
+    expect(screen.getByLabelText('Car')).toHaveValue('1');
+    expect(screen.getByLabelText('Name')).toHaveValue('Golf');
+  });
+  it('rejects a whitespace-only car name without a request', async () => {
+    defaults();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.type(screen.getByLabelText('Name'), '   ');
+    await user.click(screen.getByRole('button', { name: 'Add car' }));
+    expect(await screen.findByText('Enter a car name.')).toBeInTheDocument();
+    expect(api.addCar).not.toHaveBeenCalled();
+  });
+  it('renames the active car without reloading its records', async () => {
+    defaults();
+    api.renameCar.mockResolvedValue({ id: 1, name: 'Beetle', createdAt: '' });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    expect(screen.getByLabelText('New name')).toHaveValue('Golf');
+    await user.type(screen.getByLabelText('Liters'), '12');
+    await user.clear(screen.getByLabelText('New name'));
+    await user.type(screen.getByLabelText('New name'), 'Beetle');
+    await user.click(screen.getByRole('button', { name: 'Rename car' }));
+    expect(api.renameCar).toHaveBeenCalledWith(1, { name: 'Beetle' });
+    expect(await screen.findByText('Car renamed.')).toBeInTheDocument();
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Beetle', 'Polo']);
+    expect(screen.getByLabelText('Car')).toHaveValue('1');
+    expect(screen.getByLabelText('Liters')).toHaveValue('12');
+    expect(api.getFuel).toHaveBeenCalledTimes(1);
+  });
+  it('shows the server error when renaming to a duplicate name', async () => {
+    defaults();
+    api.renameCar.mockRejectedValue(new api.ApiError('A car with this name already exists.'));
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.clear(screen.getByLabelText('New name'));
+    await user.type(screen.getByLabelText('New name'), 'Polo');
+    await user.click(screen.getByRole('button', { name: 'Rename car' }));
+    expect(await screen.findByText('A car with this name already exists.')).toBeInTheDocument();
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Golf', 'Polo']);
+  });
+  it('prefills the rename form with the car selected after a switch', async () => {
+    defaults();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.type(screen.getByLabelText('New name'), 'x');
+    await user.selectOptions(screen.getByLabelText('Car'), 'Polo');
+    expect(screen.getByLabelText('New name')).toHaveValue('Polo');
   });
   it('shows loading and error states for the car list', async () => {
     defaults();
