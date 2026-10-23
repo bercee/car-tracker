@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { validateAdBlueRequest } from '../../src/validation/adblue.js';
+import { validateCarRequest } from '../../src/validation/car.js';
 import { validateExpenseRequest } from '../../src/validation/expense.js';
 import { validateFuelRequest } from '../../src/validation/fuel.js';
 
@@ -127,5 +128,28 @@ describe('expense validation', () => {
     [{ eventDate: valid.eventDate, notes: valid.notes }, 'amount is required'],
   ])('rejects invalid input', (input, message) => {
     expect(() => validateExpenseRequest(input)).toThrow(message);
+  });
+});
+
+describe('car validation', () => {
+  it('trims the name', () => {
+    expect(validateCarRequest({ name: '  Skoda Octavia  ' })).toEqual({ name: 'Skoda Octavia' });
+  });
+
+  it('accepts exactly 60 characters', () => {
+    expect(validateCarRequest({ name: 'x'.repeat(60) })).toEqual({ name: 'x'.repeat(60) });
+  });
+
+  it.each([
+    [{ name: '' }, 'name', 'name is required'],
+    [{ name: '   ' }, 'name', 'name is required'],
+    [{ name: 'x'.repeat(61) }, 'name', 'name must be at most 60 characters'],
+    [{ name: 5 }, 'name', 'name must be a string'],
+    [{ name: 'A', extra: 1 }, 'extra', 'extra is not allowed'],
+    [{}, 'name', 'name is required'],
+    [[], 'body', 'body must be a plain JSON object'],
+    [null, 'body', 'body must be a plain JSON object'],
+  ])('rejects invalid input', (input, field, message) => {
+    expect(() => validateCarRequest(input)).toThrow(expect.objectContaining({ field, message }));
   });
 });
