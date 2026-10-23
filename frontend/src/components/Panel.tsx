@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 
 import { ApiError } from '../api';
 import { StatusMessage } from './StatusMessage';
@@ -22,6 +22,18 @@ export interface PanelProps<T, R extends { id: number }> {
   table: (records: R[], actions: PanelActions<R>) => ReactNode;
 }
 
+// True until the component unmounts, so late responses never touch a panel that was switched away.
+function useIsMounted() {
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  return useCallback(() => mountedRef.current, []);
+}
+
 export function Panel<T, R extends { id: number }>({
   title,
   load,
@@ -41,14 +53,16 @@ export function Panel<T, R extends { id: number }>({
   const [editingId, setEditingId] = useState<number>();
   const [message, setMessage] = useState<string>();
   const [error, setError] = useState<string>();
+  const isMounted = useIsMounted();
   const refresh = async () => {
     setLoading(true);
     try {
-      setRecords(await load());
+      const loaded = await load();
+      if (isMounted()) setRecords(loaded);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to load records.');
+      if (isMounted()) setError(cause instanceof Error ? cause.message : 'Unable to load records.');
     } finally {
-      setLoading(false);
+      if (isMounted()) setLoading(false);
     }
   };
   useEffect(() => {
@@ -94,14 +108,17 @@ export function Panel<T, R extends { id: number }>({
     try {
       if (wasEditing) await update(editingId!, value);
       else await submit(value);
+      if (!isMounted()) return;
       setValue(initial());
       setEditingId(undefined);
       setMessage(`${title} record ${wasEditing ? 'updated' : 'saved'}.`);
       await refresh();
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : `Unable to ${wasEditing ? 'update' : 'save'} the record.`);
+      if (isMounted()) {
+        setError(cause instanceof ApiError ? cause.message : `Unable to ${wasEditing ? 'update' : 'save'} the record.`);
+      }
     } finally {
-      setPending(false);
+      if (isMounted()) setPending(false);
     }
   };
   const onDelete = async (record: R) => {
@@ -111,6 +128,7 @@ export function Panel<T, R extends { id: number }>({
     setMessage(undefined);
     try {
       await remove(record.id);
+      if (!isMounted()) return;
       if (editingId === record.id) {
         setEditingId(undefined);
         setValue(initial());
@@ -118,9 +136,9 @@ export function Panel<T, R extends { id: number }>({
       setMessage(`${title} record deleted.`);
       await refresh();
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Unable to delete the record.');
+      if (isMounted()) setError(cause instanceof ApiError ? cause.message : 'Unable to delete the record.');
     } finally {
-      setPending(false);
+      if (isMounted()) setPending(false);
     }
   };
 

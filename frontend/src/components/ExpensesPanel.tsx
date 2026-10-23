@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { addExpense, deleteExpense, getExpenses, updateExpense } from '../api';
 import { formatDate, formatMoney, today } from '../format';
 import { isHuf } from '../validation';
@@ -12,14 +13,18 @@ const columns: RecordTableColumn<ExpenseRecord>[] = [
   { header: 'Notes', render: (record) => record.notes ?? '—' },
 ];
 
-export function ExpensesPanel() {
+export function ExpensesPanel({ carId }: { carId: number }) {
+  const load = useCallback(() => getExpenses(carId), [carId]);
+  const submit = useCallback((value: ExpenseRequest) => addExpense(carId, value), [carId]);
+  const update = useCallback((id: number, value: ExpenseRequest) => updateExpense(carId, id, value), [carId]);
+  const remove = useCallback((id: number) => deleteExpense(carId, id), [carId]);
   return (
     <Panel
       title="Expenses"
-      load={getExpenses}
-      submit={addExpense}
-      update={updateExpense}
-      remove={deleteExpense}
+      load={load}
+      submit={submit}
+      update={update}
+      remove={remove}
       toFormValue={(r) => ({ eventDate: r.eventDate, amount: r.amount, notes: r.notes ?? '' })}
       initial={initial}
       validate={(v) =>
