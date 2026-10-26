@@ -114,7 +114,12 @@ export function App() {
       {header}
       <nav aria-label="Sections" role="tablist">
         {sections.map((section) => (
-          <button key={section} role="tab" aria-selected={activeSection === section} onClick={() => selectSection(section)}>
+          <button
+            key={section}
+            role="tab"
+            aria-selected={activeSection === section}
+            onClick={() => selectSection(section)}
+          >
             {section}
           </button>
         ))}
