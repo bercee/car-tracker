@@ -5,6 +5,7 @@ COPY package.json package-lock.json ./
 COPY contracts/package.json contracts/package.json
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
+COPY .husky/install.mjs .husky/install.mjs
 RUN npm ci --workspace @car-tracker/frontend --include-workspace-root
 
 COPY tsconfig.base.json ./
