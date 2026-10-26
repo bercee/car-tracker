@@ -9,3 +9,7 @@ Issues are tracked in GitHub Issues for `bercee/car-tracker`, via the `gh` CLI. 
 ### Domain docs
 
 Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+## Commit quality gate
+
+Before creating any commit, run `npm run check` and resolve every failure. Create commits only after the full check passes; the pre-commit hook enforces this gate.
