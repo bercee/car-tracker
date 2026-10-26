@@ -140,18 +140,6 @@ body problem.
 Press `Ctrl+C` to close the HTTP server and SQLite connection. Remove the
 disposable database and its `-wal`/`-shm` files after testing.
 
-### Upgrading from the single-car version
-
-The multi-car schema is a breaking change and has no migration. The backend
-refuses to start on a database created by the single-car version. Back up the
-old database first if you need its records; they are discarded. Then stop the
-app, delete the `DATABASE_PATH` file together with its `-wal` and `-shm` side
-files, and start the app again to create an empty multi-car database. The
-default is `./data/car.sqlite` relative to the backend working directory (so
-also `./data/car.sqlite-wal` and `./data/car.sqlite-shm`); in containers it is
-`/data/car.sqlite`, `/data/car.sqlite-wal`, and `/data/car.sqlite-shm` in the
-data volume. The reverse-proxy `/api/` rule needs no change.
-
 ## Quality checks
 
 Run the complete current gate:
@@ -170,13 +158,6 @@ npm test
 npm run test:coverage
 npm run build
 ```
-
-## Phased implementation
-
-Implementation follows `car-tracker-phased-implementation-plan.md`. Each phase
-includes its code, tests, documentation, and acceptance checks. After a phase's
-review packet is submitted, work stops until that phase is explicitly approved;
-later-phase code must not be scaffolded early.
 
 ## Production containers
 
