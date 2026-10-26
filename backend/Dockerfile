@@ -5,6 +5,7 @@ COPY package.json package-lock.json ./
 COPY contracts/package.json contracts/package.json
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
+COPY .husky/install.mjs .husky/install.mjs
 RUN apk add --no-cache python3 make g++
 RUN npm ci
 
@@ -20,6 +21,7 @@ COPY package.json package-lock.json ./
 COPY contracts/package.json contracts/package.json
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
+COPY .husky/install.mjs .husky/install.mjs
 RUN apk add --no-cache python3 make g++
 RUN npm ci --omit=dev --workspace @car-tracker/backend
 

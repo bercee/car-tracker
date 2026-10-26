@@ -142,6 +142,10 @@ disposable database and its `-wal`/`-shm` files after testing.
 
 ## Quality checks
 
+Before creating a commit, run `npm run check` and make sure it passes. The
+pre-commit hook runs this gate automatically; create commits only after all
+checks pass.
+
 Run the complete current gate:
 
 ```bash
