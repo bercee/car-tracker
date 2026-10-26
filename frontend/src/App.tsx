@@ -8,13 +8,14 @@ import { ExpensesPanel } from './components/ExpensesPanel';
 import { FuelPanel } from './components/FuelPanel';
 import { StatusMessage } from './components/StatusMessage';
 
-enum Panel {
+enum Section {
   Fuel = 'Fuel',
   AdBlue = 'AdBlue',
   Expenses = 'Expenses',
+  Cars = 'Cars',
 }
 
-const panels = Object.values(Panel);
+const recordSections = [Section.Fuel, Section.AdBlue, Section.Expenses];
 
 // Folds only ASCII A-Z, matching SQLite's NOCASE collation used by the backend.
 const foldAscii = (name: string) => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
@@ -25,8 +26,8 @@ const byName = (a: Car, b: Car) => {
 };
 
 export function App() {
-  const [active, setActive] = useState<Panel>(Panel.Fuel);
-  const [visited, setVisited] = useState<Set<Panel>>(() => new Set([Panel.Fuel]));
+  const [activeSection, setActiveSection] = useState<Section>(Section.Fuel);
+  const [visitedSections, setVisitedSections] = useState<Set<Section>>(() => new Set([Section.Fuel]));
 
   const [cars, setCars] = useState<Car[]>([]);
   const [carId, setCarId] = useState<number>();
@@ -40,6 +41,10 @@ export function App() {
         if (cancelled) return;
         setCars(loaded);
         setCarId(pickActiveCar(loaded, readStoredCarId()));
+        if (loaded.length === 0) {
+          setActiveSection(Section.Cars);
+          setVisitedSections(new Set([Section.Cars]));
+        }
       })
       .catch((cause: unknown) => {
         if (!cancelled) setCarsError(cause instanceof Error ? cause.message : 'Unable to load cars.');
@@ -63,9 +68,9 @@ export function App() {
   const onRenamed = (car: Car) => {
     setCars((current) => current.map((existing) => (existing.id === car.id ? car : existing)).sort(byName));
   };
-  const selectPanel = (panel: Panel) => {
-    setActive(panel);
-    setVisited((current) => new Set(current).add(panel));
+  const selectSection = (section: Section) => {
+    setActiveSection(section);
+    setVisitedSections((current) => new Set(current).add(section));
   };
 
   const header = (
@@ -102,42 +107,36 @@ export function App() {
       </main>
     );
   }
-  const manager = (
-    <CarManager activeCar={cars.find((car) => car.id === carId)} onAdded={onAdded} onRenamed={onRenamed} />
-  );
-  if (carId === undefined) {
-    return (
-      <main>
-        {header}
-        {manager}
-        <p>No cars yet. Add a car to start tracking.</p>
-      </main>
-    );
-  }
+  const sections = carId === undefined ? [Section.Cars] : [...recordSections, Section.Cars];
 
   return (
     <main>
       {header}
-      {manager}
-      <nav aria-label="Record types" role="tablist">
-        {panels.map((panel) => (
-          <button key={panel} role="tab" aria-selected={active === panel} onClick={() => selectPanel(panel)}>
-            {panel}
+      <nav aria-label="Sections" role="tablist">
+        {sections.map((section) => (
+          <button key={section} role="tab" aria-selected={activeSection === section} onClick={() => selectSection(section)}>
+            {section}
           </button>
         ))}
       </nav>
-      {visited.has(Panel.Fuel) && (
-        <div hidden={active !== Panel.Fuel}>
+      {visitedSections.has(Section.Cars) && (
+        <div hidden={activeSection !== Section.Cars}>
+          <CarManager activeCar={cars.find((car) => car.id === carId)} onAdded={onAdded} onRenamed={onRenamed} />
+          {carId === undefined && <p>No cars yet. Add a car to start tracking.</p>}
+        </div>
+      )}
+      {carId !== undefined && visitedSections.has(Section.Fuel) && (
+        <div hidden={activeSection !== Section.Fuel}>
           <FuelPanel key={carId} carId={carId} />
         </div>
       )}
-      {visited.has(Panel.AdBlue) && (
-        <div hidden={active !== Panel.AdBlue}>
+      {carId !== undefined && visitedSections.has(Section.AdBlue) && (
+        <div hidden={activeSection !== Section.AdBlue}>
           <AdBluePanel key={carId} carId={carId} />
         </div>
       )}
-      {visited.has(Panel.Expenses) && (
-        <div hidden={active !== Panel.Expenses}>
+      {carId !== undefined && visitedSections.has(Section.Expenses) && (
+        <div hidden={activeSection !== Section.Expenses}>
           <ExpensesPanel key={carId} carId={carId} />
         </div>
       )}

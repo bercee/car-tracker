@@ -79,6 +79,17 @@ describe('App', () => {
     expect(await screen.findByRole('tab', { name: 'Fuel' })).toHaveAttribute('aria-selected', 'true');
     await screen.findByText('No records yet.');
     expect(screen.getByLabelText('Full tank')).toBeChecked();
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('New name')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'AdBlue' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Expenses' })).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: 'Cars' }));
+    expect(screen.getByLabelText('Name')).toBeInTheDocument();
+    expect(screen.getByLabelText('New name')).toHaveValue('Golf');
+    await user.click(screen.getByRole('tab', { name: 'Fuel' }));
+    expect(screen.getByLabelText('Name')).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).not.toBeVisible();
   });
   it('loads each panel when activated and displays records', async () => {
     defaults();
@@ -459,7 +470,10 @@ describe('App', () => {
     api.getCars.mockResolvedValue([]);
     render(<App />);
     expect(await screen.findByText('No cars yet. Add a car to start tracking.')).toBeInTheDocument();
-    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Cars' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('tab', { name: 'Fuel' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'AdBlue' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Expenses' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Car')).not.toBeInTheDocument();
     expect(api.getFuel).not.toHaveBeenCalled();
   });
@@ -470,13 +484,15 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('No cars yet. Add a car to start tracking.');
+    expect(screen.getByRole('tab', { name: 'Cars' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByRole('button', { name: 'Rename car' })).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('Name'), '  Octavia ');
     await user.click(screen.getByRole('button', { name: 'Add car' }));
     expect(api.addCar).toHaveBeenCalledWith({ name: 'Octavia' });
-    expect(await screen.findByRole('tablist')).toBeInTheDocument();
+    expect(await screen.findByRole('tab', { name: 'Fuel' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Cars' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText('Car')).toHaveValue('5');
-    await waitFor(() => expect(api.getFuel).toHaveBeenCalledWith(5));
+    expect(api.getFuel).not.toHaveBeenCalled();
     expect(window.localStorage.getItem('car-tracker.activeCarId')).toBe('5');
     expect(screen.queryByText('No cars yet. Add a car to start tracking.')).not.toBeInTheDocument();
   });
@@ -486,6 +502,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'Cars' }));
     await user.type(screen.getByLabelText('Name'), 'astra');
     await user.click(screen.getByRole('button', { name: 'Add car' }));
     expect(await screen.findByText('Car added.')).toBeInTheDocument();
@@ -501,6 +518,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'Cars' }));
     await user.type(screen.getByLabelText('Name'), 'Golf');
     await user.click(screen.getByRole('button', { name: 'Add car' }));
     expect(await screen.findByText('A car with this name already exists.')).toBeInTheDocument();
@@ -513,6 +531,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'Cars' }));
     await user.type(screen.getByLabelText('Name'), '   ');
     await user.click(screen.getByRole('button', { name: 'Add car' }));
     expect(await screen.findByText('Enter a car name.')).toBeInTheDocument();
@@ -524,6 +543,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'Cars' }));
     expect(screen.getByLabelText('New name')).toHaveValue('Golf');
     await user.type(screen.getByLabelText('Liters'), '12');
     await user.clear(screen.getByLabelText('New name'));
@@ -542,6 +562,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'Cars' }));
     await user.clear(screen.getByLabelText('New name'));
     await user.type(screen.getByLabelText('New name'), 'Polo');
     await user.click(screen.getByRole('button', { name: 'Rename car' }));
@@ -553,6 +574,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'Cars' }));
     await user.type(screen.getByLabelText('New name'), 'x');
     await user.selectOptions(screen.getByLabelText('Car'), 'Polo');
     expect(screen.getByLabelText('New name')).toHaveValue('Polo');
