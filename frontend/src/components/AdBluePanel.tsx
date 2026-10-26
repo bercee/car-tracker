@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { addAdBlue, deleteAdBlue, getAdBlue, updateAdBlue } from '../api';
 import { formatDate, formatLiters, formatMoney, today } from '../format';
 import { isHuf, validateCommon } from '../validation';
@@ -13,14 +14,18 @@ const columns: RecordTableColumn<AdBlueRecord>[] = [
   { header: 'Amount', render: (record) => formatMoney(record.price) },
 ];
 
-export function AdBluePanel() {
+export function AdBluePanel({ carId }: { carId: number }) {
+  const load = useCallback(() => getAdBlue(carId), [carId]);
+  const submit = useCallback((value: AdBlueRequest) => addAdBlue(carId, value), [carId]);
+  const update = useCallback((id: number, value: AdBlueRequest) => updateAdBlue(carId, id, value), [carId]);
+  const remove = useCallback((id: number) => deleteAdBlue(carId, id), [carId]);
   return (
     <Panel
       title="AdBlue"
-      load={getAdBlue}
-      submit={addAdBlue}
-      update={updateAdBlue}
-      remove={deleteAdBlue}
+      load={load}
+      submit={submit}
+      update={update}
+      remove={remove}
       toFormValue={(r) => ({ eventDate: r.eventDate, odometerKm: r.odometerKm, liters: r.liters, price: r.price })}
       initial={initial}
       validate={(v) =>

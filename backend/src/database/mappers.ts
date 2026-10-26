@@ -1,5 +1,11 @@
-import type { AdBlueRecord, ExpenseRecord, FuelRecord } from '../domain.js';
+import type { AdBlueRecord, Car, ExpenseRecord, FuelRecord } from '../domain.js';
 import { formatHufAmount, formatScaledInteger, toSafeInteger } from '../validation/common.js';
+
+export interface CarRow {
+  id: bigint | number;
+  name: string;
+  created_at: string;
+}
 
 export interface FuelRow {
   id: bigint | number;
@@ -27,6 +33,14 @@ export interface ExpenseRow {
   created_at: string;
   amount_huf: bigint | number;
   notes: string | null;
+}
+
+export function mapCarRow(row: CarRow): Car {
+  return {
+    id: toSafeInteger(row.id, 'id'),
+    name: row.name,
+    createdAt: row.created_at,
+  };
 }
 
 export function mapFuelRow(row: FuelRow): FuelRecord {

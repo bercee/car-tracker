@@ -10,3 +10,10 @@ export function validateCommon(eventDate: string, odometer?: string, liters?: st
 }
 
 export const isHuf = (value: string) => /^\d+$/.test(value);
+
+export function validateCarName(name: string): string | undefined {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return 'Enter a car name.';
+  if (trimmed.length > 60) return 'Car name must be at most 60 characters.';
+  return undefined;
+}

@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import type { CarDatabase } from '../../src/db.js';
 import { openDatabase } from '../../src/db.js';
+import type { Car } from '../../src/domain.js';
 
 export interface TestDatabase {
   database: CarDatabase;
@@ -28,4 +29,8 @@ export function createTestDatabase(): TestDatabase {
       }
     },
   };
+}
+
+export function createCar(database: CarDatabase, name = 'Test car'): Car {
+  return database.addCar({ name });
 }

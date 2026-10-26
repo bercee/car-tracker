@@ -8,12 +8,15 @@ export class ValidationError extends Error {
   }
 }
 
-export function parseRecordId(value: string): number {
-  if (!/^\d+$/.test(value)) throw new ValidationError('id', 'id must be a positive safe integer');
+export function parseRecordId(value: string, field = 'id'): number {
+  if (!/^\d+$/.test(value)) throw new ValidationError(field, `${field} must be a positive safe integer`);
   const id = Number(value);
-  if (!Number.isSafeInteger(id) || id <= 0) throw new ValidationError('id', 'id must be a positive safe integer');
+  if (!Number.isSafeInteger(id) || id <= 0)
+    throw new ValidationError(field, `${field} must be a positive safe integer`);
   return id;
 }
+
+export const parseCarId = (value: string): number => parseRecordId(value, 'carId');
 
 export function requirePlainObject(value: unknown): Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {

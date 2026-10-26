@@ -20,6 +20,15 @@ export interface ExpenseRequest {
   notes?: string | null;
 }
 
+export interface CarRequest {
+  name: string;
+}
+
+export interface Car extends CarRequest {
+  id: number;
+  createdAt: string;
+}
+
 export interface FuelRecord extends FuelRequest {
   id: number;
   createdAt: string;
@@ -37,7 +46,7 @@ export interface ExpenseRecord extends ExpenseRequest {
   notes: string | null;
 }
 
-export type ErrorCode = 'VALIDATION_ERROR' | 'NOT_FOUND' | 'UNSUPPORTED_MEDIA_TYPE' | 'INTERNAL_ERROR';
+export type ErrorCode = 'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFLICT' | 'UNSUPPORTED_MEDIA_TYPE' | 'INTERNAL_ERROR';
 
 export interface ErrorEnvelope {
   error: {

@@ -1,6 +1,8 @@
 import type {
   AdBlueRecord,
   AdBlueRequest,
+  Car,
+  CarRequest,
   ErrorEnvelope,
   ExpenseRecord,
   ExpenseRequest,
@@ -46,15 +48,22 @@ const get = <T>(path: string) => request<T>(path);
 const post = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) });
 const put = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(body) });
 const remove = (path: string) => request<void>(path, { method: 'DELETE' });
-export const getFuel = () => get<FuelRecord[]>('/api/fuel');
-export const addFuel = (body: FuelRequest) => post<FuelRecord>('/api/fuel', body);
-export const updateFuel = (id: number, body: FuelRequest) => put<FuelRecord>(`/api/fuel/${id}`, body);
-export const deleteFuel = (id: number) => remove(`/api/fuel/${id}`);
-export const getAdBlue = () => get<AdBlueRecord[]>('/api/adblue');
-export const addAdBlue = (body: AdBlueRequest) => post<AdBlueRecord>('/api/adblue', body);
-export const updateAdBlue = (id: number, body: AdBlueRequest) => put<AdBlueRecord>(`/api/adblue/${id}`, body);
-export const deleteAdBlue = (id: number) => remove(`/api/adblue/${id}`);
-export const getExpenses = () => get<ExpenseRecord[]>('/api/expenses');
-export const addExpense = (body: ExpenseRequest) => post<ExpenseRecord>('/api/expenses', body);
-export const updateExpense = (id: number, body: ExpenseRequest) => put<ExpenseRecord>(`/api/expenses/${id}`, body);
-export const deleteExpense = (id: number) => remove(`/api/expenses/${id}`);
+export const getCars = () => get<Car[]>('/api/cars');
+export const addCar = (body: CarRequest) => post<Car>('/api/cars', body);
+export const renameCar = (id: number, body: CarRequest) => put<Car>(`/api/cars/${id}`, body);
+export const getFuel = (carId: number) => get<FuelRecord[]>(`/api/cars/${carId}/fuel`);
+export const addFuel = (carId: number, body: FuelRequest) => post<FuelRecord>(`/api/cars/${carId}/fuel`, body);
+export const updateFuel = (carId: number, id: number, body: FuelRequest) =>
+  put<FuelRecord>(`/api/cars/${carId}/fuel/${id}`, body);
+export const deleteFuel = (carId: number, id: number) => remove(`/api/cars/${carId}/fuel/${id}`);
+export const getAdBlue = (carId: number) => get<AdBlueRecord[]>(`/api/cars/${carId}/adblue`);
+export const addAdBlue = (carId: number, body: AdBlueRequest) => post<AdBlueRecord>(`/api/cars/${carId}/adblue`, body);
+export const updateAdBlue = (carId: number, id: number, body: AdBlueRequest) =>
+  put<AdBlueRecord>(`/api/cars/${carId}/adblue/${id}`, body);
+export const deleteAdBlue = (carId: number, id: number) => remove(`/api/cars/${carId}/adblue/${id}`);
+export const getExpenses = (carId: number) => get<ExpenseRecord[]>(`/api/cars/${carId}/expenses`);
+export const addExpense = (carId: number, body: ExpenseRequest) =>
+  post<ExpenseRecord>(`/api/cars/${carId}/expenses`, body);
+export const updateExpense = (carId: number, id: number, body: ExpenseRequest) =>
+  put<ExpenseRecord>(`/api/cars/${carId}/expenses/${id}`, body);
+export const deleteExpense = (carId: number, id: number) => remove(`/api/cars/${carId}/expenses/${id}`);

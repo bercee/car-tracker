@@ -1,11 +1,16 @@
 export type {
   AdBlueRecord,
   AdBlueRequest,
+  Car,
   ExpenseRecord,
   ExpenseRequest,
   FuelRecord,
   FuelRequest,
 } from '@car-tracker/contracts';
+
+export interface CarInput {
+  name: string;
+}
 
 export interface FuelInput {
   eventDate: string;

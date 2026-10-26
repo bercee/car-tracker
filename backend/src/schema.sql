@@ -2,8 +2,17 @@ PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 PRAGMA busy_timeout = 5000;
 
+CREATE TABLE IF NOT EXISTS cars (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE COLLATE NOCASE
+    CHECK (length(name) BETWEEN 1 AND 60),
+  created_at TEXT NOT NULL
+    DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
 CREATE TABLE IF NOT EXISTS fuel (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  car_id INTEGER NOT NULL REFERENCES cars(id),
   event_date TEXT NOT NULL
     CHECK (event_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
   created_at TEXT NOT NULL
@@ -18,6 +27,7 @@ CREATE TABLE IF NOT EXISTS fuel (
 
 CREATE TABLE IF NOT EXISTS adblue (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  car_id INTEGER NOT NULL REFERENCES cars(id),
   event_date TEXT NOT NULL
     CHECK (event_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
   created_at TEXT NOT NULL
@@ -30,6 +40,7 @@ CREATE TABLE IF NOT EXISTS adblue (
 
 CREATE TABLE IF NOT EXISTS expenses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  car_id INTEGER NOT NULL REFERENCES cars(id),
   event_date TEXT NOT NULL
     CHECK (event_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
   created_at TEXT NOT NULL
@@ -39,9 +50,9 @@ CREATE TABLE IF NOT EXISTS expenses (
   notes TEXT CHECK (notes IS NULL OR length(notes) <= 1000)
 );
 
-CREATE INDEX IF NOT EXISTS idx_fuel_event_date
-  ON fuel(event_date DESC, id DESC);
-CREATE INDEX IF NOT EXISTS idx_adblue_event_date
-  ON adblue(event_date DESC, id DESC);
-CREATE INDEX IF NOT EXISTS idx_expenses_event_date
-  ON expenses(event_date DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_fuel_car_event_date
+  ON fuel(car_id, event_date DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_adblue_car_event_date
+  ON adblue(car_id, event_date DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_expenses_car_event_date
+  ON expenses(car_id, event_date DESC, id DESC);

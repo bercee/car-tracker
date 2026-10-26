@@ -1,7 +1,7 @@
 # Car Tracker
 
-Car Tracker is a small, single-user application for recording vehicle fuel,
-AdBlue, and general expenses. It has a React frontend and an Express JSON API
+Car Tracker is a small, single-user application for recording fuel,
+AdBlue, and general expenses for one or more vehicles. It has a React frontend and an Express JSON API
 backed by SQLite. The repository is organized as npm workspaces for shared
 `@car-tracker/contracts`, the backend, and the frontend.
 
@@ -69,41 +69,73 @@ For a disposable local API, run from the repository root:
 DATABASE_PATH=/tmp/car-tracker-dev.sqlite npm run dev:backend
 ```
 
-The V1 endpoints are:
+The API endpoints are:
 
 ```text
 GET  /api/health
-GET  /api/fuel
-POST /api/fuel
-PUT  /api/fuel/:id
-DELETE /api/fuel/:id
-GET  /api/adblue
-POST /api/adblue
-PUT  /api/adblue/:id
-DELETE /api/adblue/:id
-GET  /api/expenses
-POST /api/expenses
-PUT  /api/expenses/:id
-DELETE /api/expenses/:id
+GET  /api/cars
+POST /api/cars
+PUT  /api/cars/:carId
+GET  /api/cars/:carId/fuel
+POST /api/cars/:carId/fuel
+PUT  /api/cars/:carId/fuel/:id
+DELETE /api/cars/:carId/fuel/:id
+GET  /api/cars/:carId/adblue
+POST /api/cars/:carId/adblue
+PUT  /api/cars/:carId/adblue/:id
+DELETE /api/cars/:carId/adblue/:id
+GET  /api/cars/:carId/expenses
+POST /api/cars/:carId/expenses
+PUT  /api/cars/:carId/expenses/:id
+DELETE /api/cars/:carId/expenses/:id
 ```
 
-For example:
+Every fuel, AdBlue, and expense record belongs to exactly one car, so create a
+car first and use its `id` in the record URLs. For example:
 
 ```bash
 curl http://127.0.0.1:3000/api/health
-curl http://127.0.0.1:3000/api/fuel
-curl -X POST http://127.0.0.1:3000/api/fuel \
+curl -X POST http://127.0.0.1:3000/api/cars \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Octavia"}'
+curl http://127.0.0.1:3000/api/cars
+curl -X PUT http://127.0.0.1:3000/api/cars/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Octavia Combi"}'
+curl http://127.0.0.1:3000/api/cars/1/fuel
+curl -X POST http://127.0.0.1:3000/api/cars/1/fuel \
   -H 'Content-Type: application/json' \
   -d '{"eventDate":"2026-09-17","odometerKm":82450,"liters":"47.300","price":"29284","fullTank":true,"remark":"Shell"}'
-curl -X PUT http://127.0.0.1:3000/api/fuel/1 \
+curl -X PUT http://127.0.0.1:3000/api/cars/1/fuel/1 \
   -H 'Content-Type: application/json' \
   -d '{"eventDate":"2026-09-18","odometerKm":82500,"liters":"46.800","price":"29000","fullTank":true,"remark":"Updated"}'
-curl -i -X DELETE http://127.0.0.1:3000/api/fuel/1
+curl -i -X DELETE http://127.0.0.1:3000/api/cars/1/fuel/1
 ```
 
-Successful updates return `200` with the updated record; successful deletes
-return `204` with an empty body. A missing record ID returns the standard JSON
-`404 NOT_FOUND` error envelope. Member IDs must be positive safe integers.
+A car is `{ "id": 1, "name": "Octavia", "createdAt": "2026-09-17T08:00:00.000Z" }`.
+Car names are trimmed, must be 1 to 60 characters, and are unique ignoring
+ASCII case. `GET /api/cars` returns `200` with all cars sorted by name
+(case-insensitive), then ID; `POST /api/cars` returns `201` with the new car;
+`PUT /api/cars/:carId` renames a car and returns `200` with the updated car.
+Cars cannot be deleted. A duplicate name returns `409` with the error code
+`CONFLICT` and field `name`. Renaming an unknown car returns `404 NOT_FOUND`
+(field `carId`), and an invalid name returns `400 VALIDATION_ERROR` (field
+`name`).
+
+Record request and response bodies are unchanged and do not contain a car ID.
+Successful record creates return `201`, lists and updates return `200`, and
+successful deletes return `204` with an empty body. Records are only visible
+through their own car's URLs. A `carId` or record `id` that is not a positive
+safe integer returns `400 VALIDATION_ERROR` (field `carId` or `id`), and an
+unknown car or record returns the standard JSON `404 NOT_FOUND` error envelope
+(field `carId` or `id`). Nested routes validate in this order: `carId` format,
+car existence, record `id`, then the request body.
+
+Body checks apply to every `POST` and `PUT` under `/api/cars` before the
+`carId` is validated: a `Content-Type` other than `application/json` returns
+`415 UNSUPPORTED_MEDIA_TYPE`, a body over 16 KB returns `413`, and malformed
+JSON returns `400`. So a request with a bad body and a bad `carId` reports the
+body problem.
 
 Press `Ctrl+C` to close the HTTP server and SQLite connection. Remove the
 disposable database and its `-wal`/`-shm` files after testing.
@@ -126,13 +158,6 @@ npm test
 npm run test:coverage
 npm run build
 ```
-
-## Phased implementation
-
-Implementation follows `car-tracker-phased-implementation-plan.md`. Each phase
-includes its code, tests, documentation, and acceptance checks. After a phase's
-review packet is submitted, work stops until that phase is explicitly approved;
-later-phase code must not be scaffolded early.
 
 ## Production containers
 
@@ -195,12 +220,26 @@ configuration, replacing the example hostname and retaining that proxy's
 certificate directives. Basic Auth and TLS stay exclusively in that outer
 proxy. Validate its configuration with `nginx -t` before any separately
 approved reload. The `/api/` `proxy_pass` has no URI suffix, preserving request
-paths such as `/api/fuel`.
+paths such as `/api/cars`.
 
 For local teardown of this example deployment, run `docker compose down` from
 the deployment directory. This removes containers but retains `./data` and its
 SQLite database. Remove that directory manually only when the data is no longer
 needed.
+
+### Upgrading an existing deployment
+
+The multi-car release changes the database schema without a migration, and the
+backend refuses to start on an old database. Follow the release checklist below
+through the image pull and the backup step (see Backup, rollback, and
+troubleshooting), so the old records are saved first. Then run
+`docker compose down` in the deployment directory and delete
+`./data/car.sqlite` together with `./data/car.sqlite-wal` and
+`./data/car.sqlite-shm` (they are `/data/car.sqlite`, `/data/car.sqlite-wal`,
+and `/data/car.sqlite-shm` inside the container). Continue with the remaining
+checklist steps; the backend creates a fresh database on start. For the local
+production-stack test, run `docker compose -f deploy/compose.local.yml down -v`
+to drop its volume. The proxy's `/api/` rule needs no change.
 
 ### Local production-stack test
 
@@ -310,10 +349,12 @@ To roll back, restore the prior immutable SHA in `.env`, then run:
 docker compose pull && docker compose up -d
 ```
 
-V1 schema initialization is additive and idempotent, so an ordinary image
-rollback does not require restoring the database. Restore a backup only when a
-future incompatible schema change requires it, and test restoration
-periodically.
+Schema initialization is idempotent, so an ordinary image rollback between
+multi-car releases does not require restoring the database. Rolling back from
+the multi-car release to a single-car image requires restoring the pre-upgrade
+backup, and loses every record entered since the upgrade. Restore a backup
+whenever a rollback crosses an incompatible schema change, such as this
+release, and test restoration periodically.
 
 If pulls fail, confirm the registry login uses a package-read credential and
 that package visibility/linkage permits the account access. If a container does

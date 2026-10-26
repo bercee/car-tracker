@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { addFuel, deleteFuel, getFuel, updateFuel } from '../api';
 import { formatDate, formatLiters, formatMoney, today } from '../format';
 import { isHuf, validateCommon } from '../validation';
@@ -22,14 +23,18 @@ const columns: RecordTableColumn<FuelRecord>[] = [
   { header: 'Remark', render: (record) => record.remark ?? '—' },
 ];
 
-export function FuelPanel() {
+export function FuelPanel({ carId }: { carId: number }) {
+  const load = useCallback(() => getFuel(carId), [carId]);
+  const submit = useCallback((value: FuelRequest) => addFuel(carId, value), [carId]);
+  const update = useCallback((id: number, value: FuelRequest) => updateFuel(carId, id, value), [carId]);
+  const remove = useCallback((id: number) => deleteFuel(carId, id), [carId]);
   return (
     <Panel
       title="Fuel"
-      load={getFuel}
-      submit={addFuel}
-      update={updateFuel}
-      remove={deleteFuel}
+      load={load}
+      submit={submit}
+      update={update}
+      remove={remove}
       toFormValue={(r) => ({
         eventDate: r.eventDate,
         odometerKm: r.odometerKm,
