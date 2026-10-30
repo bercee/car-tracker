@@ -197,13 +197,14 @@ docker network create reverse-proxy
 ```
 
 The `database` network is also external: it is the network the shared
-PostgreSQL service is attached to (see its README), and both the `migrate` and
+PostgreSQL service is attached to (see the
+[Shared Postgres README](https://github.com/bercee/docker-services/blob/main/postgres/README.md)), and both the `migrate` and
 `backend` services join it.
 
 Replace `OWNER` in `compose.yml` with the lowercase GitHub owner. Fill in
 the `DB_*` values in `.env`, and set `APP_VERSION` to an immutable
-`sha-<full commit SHA>` image tag after publication. The `reverse-proxy` network is external: attach the existing TLS
-reverse-proxy container to it separately. Neither application service publishes
+`sha-<full commit SHA>` image tag after publication. The `reverse-proxy`
+network is external: attach the existing TLS reverse-proxy container to it separately. Neither application service publishes
 a host port.
 
 On `docker compose up`, the one-shot `migrate` service applies pending
@@ -326,10 +327,11 @@ After its workflow completes, verify that the semantic tags and that commit's
 
 ### Backup, rollback, and troubleshooting
 
-To roll back, restore the prior immutable SHA in `.env`, then run the command
-below. Migrations are not reverted automatically. The old SQLite file (if any)
-is never read or deleted by the application; keep it until the PostgreSQL
-cutover is verified, then delete it by hand.
+To roll back across the PostgreSQL cutover, restore the previous compose file
+(with its `/data` mount) and the prior immutable SHA in `.env`. The SQLite file
+is never read or deleted by the application: keep it until the cutover is
+verified, then delete it by hand. Migrations are not reverted automatically. To
+roll back an ordinary release, restore the prior SHA in `.env` and run:
 
 ```bash
 docker compose pull && docker compose up -d
