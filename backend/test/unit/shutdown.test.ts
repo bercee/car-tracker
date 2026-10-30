@@ -11,7 +11,11 @@ describe('shutdown coordinator', () => {
         callback();
       },
     };
-    const database = { close: vi.fn(() => events.push('database')) };
+    const database = {
+      close: vi.fn(() => {
+        events.push('database');
+      }),
+    };
     const exit = vi.fn((code: number) => events.push(`exit:${code}`));
     const shutdown = createShutdownCoordinator(server, database, { exit });
 

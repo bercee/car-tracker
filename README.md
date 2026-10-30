@@ -2,7 +2,7 @@
 
 Car Tracker is a small, single-user application for recording fuel,
 AdBlue, and general expenses for one or more vehicles. It has a React frontend and an Express JSON API
-backed by SQLite. The repository is organized as npm workspaces for shared
+backed by PostgreSQL. The repository is organized as npm workspaces for shared
 `@car-tracker/contracts`, the backend, and the frontend.
 
 All monetary values are whole Hungarian forints. Fuel and AdBlue total prices,
@@ -143,8 +143,7 @@ Body checks apply to every `POST` and `PUT` under `/api/cars` before the
 JSON returns `400`. So a request with a bad body and a bad `carId` reports the
 body problem.
 
-Press `Ctrl+C` to close the HTTP server and SQLite connection. Remove the
-disposable database and its `-wal`/`-shm` files after testing.
+Press `Ctrl+C` to close the HTTP server and the PostgreSQL pool.
 
 ## Quality checks
 
@@ -181,15 +180,15 @@ docker build -f frontend/Dockerfile -t car-tracker-frontend:test .
 ```
 
 The backend image contains compiled JavaScript and production dependencies
-only, runs as the built-in numeric `node` user (UID/GID `1000`), and persists
-SQLite data at `/data/car.sqlite`. The frontend image is static Nginx content.
+only, runs as the built-in numeric `node` user (UID/GID `1000`), and stores data in
+PostgreSQL. The frontend image is static Nginx content.
 
 ### Home-server Compose setup
 
 Do this in a new deployment directory, outside the Git checkout if preferred:
 
 ```bash
-mkdir -p car-tracker-deploy/data
+mkdir -p car-tracker-deploy
 cp deploy/compose.example.yml car-tracker-deploy/compose.yml
 cp deploy/.env.example car-tracker-deploy/.env
 docker network create reverse-proxy
@@ -200,20 +199,6 @@ Replace `OWNER` in `compose.yml` with the lowercase GitHub owner. Set
 publication. The `reverse-proxy` network is external: attach the existing TLS
 reverse-proxy container to it separately. Neither application service publishes
 a host port.
-
-The bind mount must be writable by the backend's runtime user and must not be
-world-writable:
-
-```bash
-chown 1000:1000 car-tracker-deploy/data
-chmod 750 car-tracker-deploy/data
-```
-
-Confirm the UID/GID before setup with:
-
-```bash
-docker run --rm --entrypoint id car-tracker-backend:test
-```
 
 From the deployment directory, validate the generated configuration and start
 the containers:
@@ -233,23 +218,7 @@ approved reload. The `/api/` `proxy_pass` has no URI suffix, preserving request
 paths such as `/api/cars`.
 
 For local teardown of this example deployment, run `docker compose down` from
-the deployment directory. This removes containers but retains `./data` and its
-SQLite database. Remove that directory manually only when the data is no longer
-needed.
-
-### Upgrading an existing deployment
-
-The multi-car release changes the database schema without a migration, and the
-backend refuses to start on an old database. Follow the release checklist below
-through the image pull and the backup step (see Backup, rollback, and
-troubleshooting), so the old records are saved first. Then run
-`docker compose down` in the deployment directory and delete
-`./data/car.sqlite` together with `./data/car.sqlite-wal` and
-`./data/car.sqlite-shm` (they are `/data/car.sqlite`, `/data/car.sqlite-wal`,
-and `/data/car.sqlite-shm` inside the container). Continue with the remaining
-checklist steps; the backend creates a fresh database on start. For the local
-production-stack test, run `docker compose -f deploy/compose.local.yml down -v`
-to drop its volume. The proxy's `/api/` rule needs no change.
+the deployment directory. This removes containers; the data stays in PostgreSQL.
 
 ### Local production-stack test
 
@@ -323,7 +292,7 @@ docker login ghcr.io
    docker pull ghcr.io/OWNER/car-tracker-backend:sha-<full-commit-sha>
    ```
 
-4. Back up the SQLite database before any schema-changing release.
+4. Back up the database before any schema-changing release.
 5. Set `APP_VERSION=sha-<full-commit-sha>` in the deployment directory's
    private `.env`; never use the mutable `main` tag for a release.
 6. Run `docker compose pull && docker compose up -d`, then inspect
@@ -345,33 +314,18 @@ After its workflow completes, verify that the semantic tags and that commit's
 
 ### Backup, rollback, and troubleshooting
 
-Run SQLite's online backup command on the server; do not copy only a live main
-database file while WAL writes may be active:
-
-```bash
-mkdir -p backups
-sqlite3 ./data/car.sqlite ".backup './backups/car-$(date +%F-%H%M%S).sqlite'"
-```
-
 To roll back, restore the prior immutable SHA in `.env`, then run:
 
 ```bash
 docker compose pull && docker compose up -d
 ```
 
-Schema initialization is idempotent, so an ordinary image rollback between
-multi-car releases does not require restoring the database. Rolling back from
-the multi-car release to a single-car image requires restoring the pre-upgrade
-backup, and loses every record entered since the upgrade. Restore a backup
-whenever a rollback crosses an incompatible schema change, such as this
-release, and test restoration periodically.
-
 If pulls fail, confirm the registry login uses a package-read credential and
 that package visibility/linkage permits the account access. If a container does
 not start, check `docker compose ps`, then `docker compose logs backend` or
 `docker compose logs frontend`; confirm `APP_VERSION` exists for both images
-and that `./data` is owned by the backend runtime UID/GID. If the proxy returns
+and that the `DB_*` settings reach the PostgreSQL server. If the proxy returns
 an error, validate its configuration with `nginx -t`, confirm all containers are
 on `reverse-proxy`, and check that its `/api/` upstream preserves the `/api`
-prefix. CI never accesses the home server, SSH, Basic Auth material, or SQLite
+prefix. CI never accesses the home server, SSH, Basic Auth material, or database
 data.

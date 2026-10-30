@@ -1,7 +1,9 @@
-import type { CarDatabase } from './database/carDatabase.js';
-
 export interface ClosableServer {
   close(callback: (error?: Error) => void): void;
+}
+
+export interface Closable {
+  close(): void | Promise<void>;
 }
 
 export interface ShutdownOptions {
@@ -13,7 +15,7 @@ export type Shutdown = (signal: NodeJS.Signals) => Promise<void>;
 
 export function createShutdownCoordinator(
   server: ClosableServer,
-  database: Pick<CarDatabase, 'close'>,
+  database: Closable,
   options: ShutdownOptions = {},
 ): Shutdown {
   const exit = options.exit ?? ((code: number) => process.exit(code));
@@ -22,14 +24,14 @@ export function createShutdownCoordinator(
 
   return (signal) => {
     shutdown ??= closeServer(server)
-      .then(() => {
-        database.close();
+      .then(async () => {
+        await database.close();
         exit(0);
       })
-      .catch((error: unknown) => {
+      .catch(async (error: unknown) => {
         logger.error(`Failed to shut down after ${signal}`, error);
         try {
-          database.close();
+          await database.close();
         } catch (closeError: unknown) {
           logger.error('Failed to close database during shutdown', closeError);
         }

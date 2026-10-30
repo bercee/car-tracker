@@ -20,9 +20,6 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: '3000'
-      DATABASE_PATH: /data/car.sqlite
-    volumes:
-      - backend-data:/data
     networks:
       app:
         aliases:
@@ -39,6 +36,3 @@ services:
 
 networks:
   app:
-
-volumes:
-  backend-data:

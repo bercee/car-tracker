@@ -1,9 +1,9 @@
 import request from 'supertest';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
 import type { TestDatabase } from '../helpers/testDb.js';
-import { createCar, createTestDatabase } from '../helpers/testDb.js';
+import { createCar, startTestDatabase } from '../helpers/testDb.js';
 
 const healthy = () => Promise.resolve();
 
@@ -12,14 +12,19 @@ describe('Express API', () => {
   let carId: number;
   const logger = { error: vi.fn() };
 
-  beforeEach(() => {
-    testDatabase = createTestDatabase();
-    carId = createCar(testDatabase.database).id;
-    logger.error.mockClear();
+  beforeAll(async () => {
+    testDatabase = await startTestDatabase();
+  }, 60_000);
+
+  afterAll(async () => {
+    await testDatabase.stop();
   });
 
-  afterEach(() => {
-    testDatabase.closeAndRemove();
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    await testDatabase.reset();
+    carId = (await createCar(testDatabase.database)).id;
+    logger.error.mockClear();
   });
 
   it('creates, canonicalizes, and lists a fuel record', async () => {
@@ -233,7 +238,7 @@ describe('Express API', () => {
 
   it('scopes records to the car in the URL', async () => {
     const app = createApp(testDatabase.database, logger, healthy);
-    const otherCarId = createCar(testDatabase.database, 'Other car').id;
+    const otherCarId = (await createCar(testDatabase.database, 'Other car')).id;
     const bodies = {
       fuel: { eventDate: '2026-09-15', odometerKm: 10, liters: '1', price: '100', fullTank: true },
       adblue: { eventDate: '2026-09-15', odometerKm: 10, liters: '1', price: '100' },
@@ -337,9 +342,7 @@ describe('Express API', () => {
   });
 
   it('sanitizes and logs internal failures', async () => {
-    vi.spyOn(testDatabase.database, 'listFuel').mockImplementation(() => {
-      throw new Error('SQL statement and private path');
-    });
+    vi.spyOn(testDatabase.database, 'listFuel').mockRejectedValue(new Error('SQL statement and private path'));
 
     const response = await request(createApp(testDatabase.database, logger, healthy)).get(`/api/cars/${carId}/fuel`);
 
@@ -356,14 +359,10 @@ describe('Express API', () => {
     const postCar = (app: ReturnType<typeof createApp>, name: unknown) => request(app).post('/api/cars').send({ name });
 
     it('returns an empty list on a fresh database', async () => {
-      const fresh = createTestDatabase();
-      try {
-        const response = await request(createApp(fresh.database, logger, healthy)).get('/api/cars');
-        expect(response.status).toBe(200);
-        expect(response.body).toEqual([]);
-      } finally {
-        fresh.closeAndRemove();
-      }
+      await testDatabase.reset();
+      const response = await request(createApp(testDatabase.database, logger, healthy)).get('/api/cars');
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual([]);
     });
 
     it('creates a car with a trimmed name and lists cars sorted by name', async () => {
