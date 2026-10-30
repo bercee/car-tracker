@@ -2,7 +2,7 @@ name: car-tracker
 
 services:
   frontend:
-    image: ghcr.io/OWNER/car-tracker-frontend:${APP_VERSION:-main}
+    image: ghcr.io/OWNER/car-tracker-frontend:${APP_VERSION:-latest}
     restart: unless-stopped
     networks:
       proxy:
@@ -18,7 +18,7 @@ services:
       - no-new-privileges:true
 
   migrate:
-    image: ghcr.io/OWNER/car-tracker-backend:${APP_VERSION:-main}
+    image: ghcr.io/OWNER/car-tracker-backend:${APP_VERSION:-latest}
     command: ['node', 'dist/migrate.js']
     restart: 'no'
     environment:
@@ -34,7 +34,7 @@ services:
       - no-new-privileges:true
 
   backend:
-    image: ghcr.io/OWNER/car-tracker-backend:${APP_VERSION:-main}
+    image: ghcr.io/OWNER/car-tracker-backend:${APP_VERSION:-latest}
     restart: unless-stopped
     depends_on:
       migrate:
