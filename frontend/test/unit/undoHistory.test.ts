@@ -93,4 +93,97 @@ describe('undo history', () => {
     expect((await history.undo())?.recordId).toBe(1);
     expect(history.redoDescription()).toBe('first');
   });
+
+  describe('re-created records', () => {
+    // A fake record store: create hands out new ids, remove forgets them.
+    const store = () => {
+      let next = 100;
+      const log: string[] = [];
+      const edit = (id: number): UndoEntry => ({
+        recordId: id,
+        description: `edit ${id}`,
+        reverse: (current) => {
+          log.push(`update ${current} back`);
+          return Promise.resolve();
+        },
+        reapply: (current) => {
+          log.push(`update ${current} again`);
+          return Promise.resolve();
+        },
+      });
+      const deletion = (id: number): UndoEntry => ({
+        recordId: id,
+        description: `delete ${id}`,
+        reverse: () => {
+          log.push('create');
+          return Promise.resolve(next++);
+        },
+        reapply: (current) => {
+          log.push(`remove ${current}`);
+          return Promise.resolve();
+        },
+      });
+      return { log, edit, deletion };
+    };
+
+    it('points earlier entries at the new id after undoing a delete', async () => {
+      const { log, edit, deletion } = store();
+      const history = new UndoHistory();
+      history.record(edit(5));
+      history.record(deletion(5));
+
+      await history.undo();
+      await history.undo();
+      expect(log).toEqual(['create', 'update 100 back']);
+
+      await history.redo();
+      expect(log.at(-1)).toBe('update 100 again');
+    });
+
+    it('follows the Record through repeated re-creation, in done and undone entries', async () => {
+      const { log, edit, deletion } = store();
+      const history = new UndoHistory();
+      history.record(edit(5));
+      history.record(deletion(5));
+
+      await history.undo(); // re-created as 100
+      await history.undo(); // edit undone on 100
+      await history.redo(); // edit redone on 100
+      await history.redo(); // delete redone on 100
+      await history.undo(); // re-created again as 101
+      expect(log).toEqual(['create', 'update 100 back', 'update 100 again', 'remove 100', 'create']);
+
+      await history.undo();
+      await history.redo();
+      expect(log.slice(-2)).toEqual(['update 101 back', 'update 101 again']);
+    });
+
+    it('remaps entries waiting in the undone list when a Record is re-created', async () => {
+      const { log, edit, deletion } = store();
+      const history = new UndoHistory();
+      history.record(edit(5));
+      history.record(deletion(5));
+      await history.undo(); // 100; both entries now point at 100
+      await history.undo(); // edit sits in undone
+      await history.redo();
+      await history.redo(); // delete redone on 100
+      await history.undo(); // 101: the edit is in done, the delete in undone
+      await history.undo();
+      expect(log.at(-1)).toBe('update 101 back');
+      expect((await history.redo())?.recordId).toBe(101);
+    });
+
+    it('leaves entries for other Records untouched', async () => {
+      const { log, edit, deletion } = store();
+      const history = new UndoHistory();
+      history.record(edit(7));
+      history.record(edit(5));
+      history.record(deletion(5));
+
+      await history.undo();
+      await history.undo();
+      await history.undo();
+      expect(log).toEqual(['create', 'update 100 back', 'update 7 back']);
+    });
+  });
 });
