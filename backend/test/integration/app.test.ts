@@ -269,6 +269,8 @@ describe('Express API', () => {
     for (const id of ['abc', '0', '-1', '1.5', '9007199254740992']) {
       const response = await request(app).get(`/api/cars/${id}/fuel`).expect(400);
       expect(response.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field: 'carId' });
+      const renamed = await request(app).put(`/api/cars/${id}`).send({ name: 'X' }).expect(400);
+      expect(renamed.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field: 'carId' });
     }
 
     const badRecordId = await request(app).put(`/api/cars/${carId}/fuel/abc`).send({}).expect(400);

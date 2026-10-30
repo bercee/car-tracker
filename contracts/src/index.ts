@@ -1,3 +1,11 @@
+import { z } from 'zod';
+
+// A path segment (Car or Record id) coerced to a positive integer.
+export const pathIdSchema = z.coerce
+  .number({ error: 'must be a positive integer' })
+  .int({ error: 'must be a positive integer' })
+  .positive({ error: 'must be a positive integer' });
+
 export interface FuelRequest {
   eventDate: string;
   odometerKm: number;

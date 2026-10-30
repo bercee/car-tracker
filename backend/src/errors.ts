@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler } from 'express';
+import { ZodError } from 'zod';
 import type { ErrorCode, ErrorEnvelope } from '@car-tracker/contracts';
 
 import { ValidationError } from './validation/common.js';
@@ -26,6 +27,11 @@ export function toHttpError(error: unknown): HttpError {
 
   if (error instanceof ValidationError) {
     return new HttpError(400, 'VALIDATION_ERROR', error.message, error.field);
+  }
+
+  if (error instanceof ZodError) {
+    const issue = error.issues[0]!;
+    return new HttpError(400, 'VALIDATION_ERROR', issue.message, issue.path.join('.') || 'body');
   }
 
   if (isBodyParserError(error, 413, 'entity.too.large')) {

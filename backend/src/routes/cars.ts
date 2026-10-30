@@ -4,7 +4,7 @@ import type { CarDatabase } from '../database/carDatabase.js';
 import { DuplicateCarNameError } from '../database/errors.js';
 import { HttpError } from '../errors.js';
 import { validateCarRequest } from '../validation/car.js';
-import { parseCarId } from '../validation/common.js';
+import { carParams } from './params.js';
 
 export function createCarsRouter(database: CarDatabase): Router {
   const router = Router();
@@ -19,7 +19,7 @@ export function createCarsRouter(database: CarDatabase): Router {
   });
 
   router.put('/:carId', async (request, response) => {
-    const id = parseCarId(request.params.carId);
+    const { carId: id } = carParams.parse(request.params);
     const input = validateCarRequest(request.body);
     const car = await withDuplicateNameConflict(() => database.renameCar(id, input));
     if (!car) throw new HttpError(404, 'NOT_FOUND', 'Car not found', 'carId');

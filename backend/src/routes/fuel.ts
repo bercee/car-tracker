@@ -2,9 +2,9 @@ import { Router } from 'express';
 
 import type { CarDatabase } from '../database/carDatabase.js';
 import { validateFuelRequest } from '../validation/fuel.js';
-import { parseRecordId } from '../validation/common.js';
 import { HttpError } from '../errors.js';
 import { carIdOf } from './carScope.js';
+import { recordParams } from './params.js';
 
 export function createFuelRouter(database: CarDatabase): Router {
   const router = Router({ mergeParams: true });
@@ -19,13 +19,13 @@ export function createFuelRouter(database: CarDatabase): Router {
   });
 
   router.put('/:id', async (request, response) => {
-    const id = parseRecordId(request.params.id!);
+    const { id } = recordParams.parse(request.params);
     const record = await database.updateFuel(carIdOf(response), id, validateFuelRequest(request.body));
     if (!record) throw new HttpError(404, 'NOT_FOUND', 'Fuel record not found', 'id');
     response.status(200).json(record);
   });
   router.delete('/:id', async (request, response) => {
-    const id = parseRecordId(request.params.id!);
+    const { id } = recordParams.parse(request.params);
     if (!(await database.deleteFuel(carIdOf(response), id)))
       throw new HttpError(404, 'NOT_FOUND', 'Fuel record not found', 'id');
     response.status(204).send();

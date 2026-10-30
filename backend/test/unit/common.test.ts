@@ -5,12 +5,10 @@ import {
   formatHufAmount,
   formatScaledInteger,
   normalizeOptionalText,
-  parseCarId,
   parseCalendarDate,
   parseDecimalToScaledInteger,
   parseHufAmount,
   parseIntegerInRange,
-  parseRecordId,
   requireExactKeys,
   requirePlainObject,
 } from '../../src/validation/common.js';
@@ -150,29 +148,5 @@ describe('storage formatting', () => {
     expect(formatHufAmount(0)).toBe('0');
     expect(formatHufAmount(619)).toBe('619');
     expect(() => formatHufAmount(-1)).toThrow('stored HUF amount must not be negative');
-  });
-});
-
-describe('car id parsing', () => {
-  it('parses a positive integer', () => {
-    expect(parseCarId('7')).toBe(7);
-  });
-
-  it.each(['0', '-1', '1.5', 'abc', '9007199254740992'])('rejects %s with field carId', (value) => {
-    expect(() => parseCarId(value)).toThrow(ValidationError);
-    expect(() => parseCarId(value)).toThrow('carId must be a positive safe integer');
-    try {
-      parseCarId(value);
-    } catch (error) {
-      expect((error as ValidationError).field).toBe('carId');
-    }
-  });
-});
-
-describe('record id parsing', () => {
-  it('reports field id by default', () => {
-    expect(() => parseRecordId('abc')).toThrow(
-      expect.objectContaining({ field: 'id', message: 'id must be a positive safe integer' }),
-    );
   });
 });
