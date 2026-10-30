@@ -179,9 +179,11 @@ docker build -f backend/Dockerfile -t car-tracker-backend:test .
 docker build -f frontend/Dockerfile -t car-tracker-frontend:test .
 ```
 
-The backend image contains compiled JavaScript and production dependencies
-only, runs as the built-in numeric `node` user (UID/GID `1000`), and stores data in
-PostgreSQL. The frontend image is static Nginx content.
+The backend image contains compiled JavaScript and production dependencies,
+and the Drizzle migrations; it runs as the built-in numeric `node` user (UID/GID
+`1000`) and stores data in PostgreSQL. It has two entry points: `dist/index.js`
+(the server, default) and `dist/migrate.js` (applies pending migrations and
+exits). The frontend image is static Nginx content.
 
 ### Home-server Compose setup
 
@@ -194,11 +196,21 @@ cp deploy/.env.example car-tracker-deploy/.env
 docker network create reverse-proxy
 ```
 
-Replace `OWNER` in `compose.yml` with the lowercase GitHub owner. Set
-`APP_VERSION` in `.env` to an immutable `sha-<full commit SHA>` image tag after
-publication. The `reverse-proxy` network is external: attach the existing TLS
+The `database` network is also external: it is the network the shared
+PostgreSQL service is attached to (see its README), and both the `migrate` and
+`backend` services join it.
+
+Replace `OWNER` in `compose.yml` with the lowercase GitHub owner. Fill in
+the `DB_*` values in `.env`, and set `APP_VERSION` to an immutable
+`sha-<full commit SHA>` image tag after publication. The `reverse-proxy` network is external: attach the existing TLS
 reverse-proxy container to it separately. Neither application service publishes
 a host port.
+
+On `docker compose up`, the one-shot `migrate` service applies pending
+migrations first; the `backend` starts only after it exits successfully. A
+failing migration leaves `backend` uncreated and `migrate` exited non-zero, so
+check `docker compose logs migrate`. Migrations are not applied by the backend
+itself.
 
 From the deployment directory, validate the generated configuration and start
 the containers:
@@ -314,7 +326,10 @@ After its workflow completes, verify that the semantic tags and that commit's
 
 ### Backup, rollback, and troubleshooting
 
-To roll back, restore the prior immutable SHA in `.env`, then run:
+To roll back, restore the prior immutable SHA in `.env`, then run the command
+below. Migrations are not reverted automatically. The old SQLite file (if any)
+is never read or deleted by the application; keep it until the PostgreSQL
+cutover is verified, then delete it by hand.
 
 ```bash
 docker compose pull && docker compose up -d
