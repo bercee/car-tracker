@@ -1,7 +1,7 @@
 # Car Tracker
 
 Car Tracker is a small, single-user application for recording fuel,
-AdBlue, and general expenses for one or more vehicles. It has a React frontend and an Express JSON API
+AdBlue, and general expenses for one or more cars. It has a React frontend and an Express JSON API
 backed by PostgreSQL. The repository is organized as npm workspaces for shared
 `@car-tracker/contracts`, the backend, and the frontend.
 
@@ -11,8 +11,9 @@ HUF input is not accepted. Liter quantities retain three-decimal precision.
 
 ## Prerequisites
 
-- Node.js 24 LTS (the Phase 1 lockfile was produced with Node.js 24.20.0)
-- npm 11 (the Phase 1 lockfile was produced with npm 11.19.0)
+- Node.js 24 LTS (the lockfile was produced with Node.js 24.20.0)
+- npm 11 (the lockfile was produced with npm 11.19.0)
+- Docker with Compose, for the development database and the container builds
 
 Run `nvm use` from the repository root when using nvm. npm installations fail
 on Node versions below 24, and unreviewed dependency install scripts are
@@ -33,6 +34,13 @@ container. Start the database first (see [Development database](#development-dat
 
 ```bash
 npm run db:up
+```
+
+Apply the database migrations. The backend never migrates on its own, so run
+this on a fresh database and after pulling a change that adds a migration:
+
+```bash
+npm run migrate --workspace backend
 ```
 
 Then run both development processes together:
@@ -57,7 +65,7 @@ npm run dev:frontend
 
 Vite proxies relative `/api` requests to `http://localhost:3000` during local
 development. Start the backend first, then open the Vite URL shown in the
-frontend terminal.
+frontend terminal. `Ctrl+C` closes the HTTP server and the PostgreSQL pool.
 
 ### Backend environment
 
@@ -82,6 +90,21 @@ npm run db:up
 ```
 
 `npm run db:down` stops it; data persists in a Docker volume.
+
+### Schema changes
+
+The schema is defined in `backend/src/schema.ts`. After changing it, generate
+a new SQL migration into `backend/drizzle/` and commit it with the schema
+change:
+
+```bash
+cd backend && npx drizzle-kit generate --name <short-description>
+```
+
+Migrations run in order through the `migrate` entry point, both in development
+and in the deployed `migrate` service.
+
+## API
 
 The API endpoints are:
 
@@ -126,6 +149,11 @@ curl -X PUT http://127.0.0.1:3000/api/cars/1/fuel/1 \
 curl -i -X DELETE http://127.0.0.1:3000/api/cars/1/fuel/1
 ```
 
+`GET /api/health` runs `SELECT 1` against PostgreSQL with a 2-second limit. It
+returns `200 {"status":"ok"}` when the database answers and
+`503 {"status":"unavailable"}` when it does not. The backend keeps running
+while the database is down and reconnects once it is back.
+
 A car is `{ "id": 1, "name": "Octavia", "createdAt": "2026-09-17T08:00:00.000Z" }`.
 Car names are trimmed, must be 1 to 60 characters, and are unique ignoring
 ASCII case. `GET /api/cars` returns `200` with all cars sorted by name
@@ -136,7 +164,8 @@ Cars cannot be deleted. A duplicate name returns `409` with the error code
 (field `carId`), and an invalid name returns `400 VALIDATION_ERROR` (field
 `name`).
 
-Record request and response bodies are unchanged and do not contain a car ID.
+Record request and response bodies do not contain a car ID; the car comes from
+the URL.
 Successful record creates return `201`, lists and updates return `200`, and
 successful deletes return `204` with an empty body. Records are only visible
 through their own car's URLs. A `carId` or record `id` that is not a positive
@@ -150,8 +179,6 @@ Body checks apply to every `POST` and `PUT` under `/api/cars` before the
 `415 UNSUPPORTED_MEDIA_TYPE`, a body over 16 KB returns `413`, and malformed
 JSON returns `400`. So a request with a bad body and a bad `carId` reports the
 body problem.
-
-Press `Ctrl+C` to close the HTTP server and the PostgreSQL pool.
 
 ## Quality checks
 
@@ -175,6 +202,10 @@ npm test
 npm run test:coverage
 npm run build
 ```
+
+Backend tests need neither Docker nor the development database: each test file
+starts its own throwaway PostgreSQL 17 through `embedded-postgres`. PostgreSQL
+refuses to run as root, so run the tests as a regular user.
 
 ## Compose files
 
@@ -214,16 +245,16 @@ cp deploy/.env.example car-tracker-deploy/.env
 docker network create reverse-proxy
 ```
 
-The `database` network is also external: it is the network the shared
-PostgreSQL service is attached to (see the
-[Shared Postgres README](https://github.com/bercee/docker-services/blob/main/postgres/README.md)), and both the `migrate` and
-`backend` services join it.
-
 Replace `OWNER` in `compose.yml` with the lowercase GitHub owner. Fill in
 the `DB_*` values in `.env`, and set `APP_VERSION` to an immutable
-`sha-<full commit SHA>` image tag after publication. The `reverse-proxy`
-network is external: attach the existing TLS reverse-proxy container to it separately. Neither application service publishes
-a host port.
+`sha-<full commit SHA>` image tag after publication.
+
+Both networks are external. Attach the existing TLS reverse-proxy container to
+`reverse-proxy` separately. `database` is the network of the shared PostgreSQL
+service, which already holds the `car_tracker` database and role (see the
+[Shared Postgres README](https://github.com/bercee/docker-services/blob/main/postgres/README.md));
+the `migrate` and `backend` services join it. No service publishes a host
+port.
 
 On `docker compose up`, the one-shot `migrate` service applies pending
 migrations first; the `backend` starts only after it exits successfully. A
@@ -329,7 +360,8 @@ docker login ghcr.io
 5. Set `APP_VERSION=sha-<full-commit-sha>` in the deployment directory's
    private `.env`; never use the mutable `main` tag for a release.
 6. Run `docker compose pull && docker compose up -d`, then inspect
-   `docker compose ps` and `docker compose logs backend`.
+   `docker compose ps`, `docker compose logs migrate` and
+   `docker compose logs backend`.
 7. Open the authenticated application. Do not create synthetic production rows
    just to test the deployment.
 
@@ -349,8 +381,7 @@ After its workflow completes, verify that the semantic tags and that commit's
 
 Backups are manual until automation is designed (see
 [ADR 0001](docs/adr/0001-shared-postgres-service.md)). Run this on the home
-server before the PostgreSQL cutover and before any schema-changing release,
-replacing `<postgres-container>` with the shared PostgreSQL container's name.
+server before any schema-changing release, replacing `<postgres-container>` with the shared PostgreSQL container's name.
 It writes a compressed dump of only the `car_tracker` database:
 
 ```bash
@@ -369,12 +400,9 @@ docker compose up -d
 
 ### Rollback and troubleshooting
 
-To roll back across the PostgreSQL cutover, restore the previous compose file
-(with its `/data` mount) and the prior immutable SHA in `.env`. The SQLite file
-is never read or deleted by the application: keep it until the cutover is
-verified, then delete it by hand. Migrations are not reverted automatically;
-restore the pre-release dump if a schema change must be undone. To
-roll back an ordinary release, restore the prior SHA in `.env` and run:
+To roll back a release, restore the prior SHA in `.env` and run the command
+below. Migrations are not reverted automatically; if the release changed the
+schema, restore its pre-release dump first.
 
 ```bash
 docker compose pull && docker compose up -d
@@ -382,8 +410,8 @@ docker compose pull && docker compose up -d
 
 If pulls fail, confirm the registry login uses a package-read credential and
 that package visibility/linkage permits the account access. If a container does
-not start, check `docker compose ps`, then `docker compose logs backend` or
-`docker compose logs frontend`; confirm `APP_VERSION` exists for both images
+not start, check `docker compose ps`, then `docker compose logs migrate`,
+`docker compose logs backend` or `docker compose logs frontend`; confirm `APP_VERSION` exists for both images
 and that the `DB_*` settings reach the PostgreSQL server. If the proxy returns
 an error, validate its configuration with `nginx -t`, confirm all containers are
 on `reverse-proxy`, and check that its `/api/` upstream preserves the `/api`
