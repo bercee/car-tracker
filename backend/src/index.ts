@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
 import { openDatabase } from './db.js';
@@ -5,7 +7,10 @@ import { createShutdownCoordinator } from './shutdown.js';
 
 try {
   const config = loadConfig();
-  const database = openDatabase(config.databasePath);
+  // Temporary until the Drizzle port replaces SQLite.
+  const database = openDatabase(
+    process.env.NODE_ENV === 'production' ? '/data/car.sqlite' : path.resolve('data/car.sqlite'),
+  );
   const app = createApp(database);
   const server = app.listen(config.port, config.host);
   server.once('listening', () => {
