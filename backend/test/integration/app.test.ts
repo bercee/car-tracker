@@ -491,4 +491,46 @@ describe('Express API', () => {
       expect(fuel.body).toEqual([]);
     });
   });
+
+  describe('Car name validation', () => {
+    const invalidBodies: [string, string | object | undefined, string][] = [
+      ['blank', { name: '' }, 'name'],
+      ['whitespace-only', { name: '   ' }, 'name'],
+      ['over 60 characters after trimming', { name: 'x'.repeat(61) }, 'name'],
+      ['non-string', { name: 5 }, 'name'],
+      ['missing name', {}, 'name'],
+      ['unknown key', { name: 'A', extra: 1 }, 'body'],
+      ['array body', [], 'body'],
+      ['null body', 'null', 'body'],
+    ];
+
+    it.each(invalidBodies)('rejects a %s name on create', async (_label, body, field) => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const response = await request(app).post('/api/cars').type('json').send(body).expect(400);
+      expect(response.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field });
+      expect(typeof response.body.error.message).toBe('string');
+    });
+
+    it.each(invalidBodies)('rejects a %s name on rename', async (_label, body, field) => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const response = await request(app).put(`/api/cars/${carId}`).type('json').send(body).expect(400);
+      expect(response.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field });
+    });
+
+    it('stores a trimmed name on create and rename and accepts 60 characters', async () => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const created = await request(app).post('/api/cars').send({ name: '  Skoda Octavia  ' }).expect(201);
+      expect(created.body.name).toBe('Skoda Octavia');
+
+      const renamed = await request(app).put(`/api/cars/${created.body.id}`).send({ name: '  Fabia  ' }).expect(200);
+      expect(renamed.body.name).toBe('Fabia');
+
+      const longest = 'y'.repeat(60);
+      const padded = await request(app)
+        .post('/api/cars')
+        .send({ name: ` ${longest} ` })
+        .expect(201);
+      expect(padded.body.name).toBe(longest);
+    });
+  });
 });

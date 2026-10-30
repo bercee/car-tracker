@@ -2,7 +2,7 @@ import type {
   AdBlueInput,
   AdBlueRecord,
   Car,
-  CarInput,
+  CarRequest,
   ExpenseInput,
   ExpenseRecord,
   FuelInput,
@@ -12,8 +12,8 @@ import type {
 export interface CarDatabase {
   listCars(): Promise<Car[]>;
   getCar(id: number): Promise<Car | undefined>;
-  addCar(input: CarInput): Promise<Car>;
-  renameCar(id: number, input: CarInput): Promise<Car | undefined>;
+  addCar(input: CarRequest): Promise<Car>;
+  renameCar(id: number, input: CarRequest): Promise<Car | undefined>;
   addFuel(carId: number, input: FuelInput): Promise<FuelRecord>;
   updateFuel(carId: number, id: number, input: FuelInput): Promise<FuelRecord | undefined>;
   deleteFuel(carId: number, id: number): Promise<boolean>;

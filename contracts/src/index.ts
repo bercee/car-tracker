@@ -28,9 +28,15 @@ export interface ExpenseRequest {
   notes?: string | null;
 }
 
-export interface CarRequest {
-  name: string;
-}
+export const carRequestSchema = z.strictObject({
+  name: z
+    .string({ error: 'Car name must be text.' })
+    .trim()
+    .min(1, { error: 'Enter a car name.' })
+    .max(60, { error: 'Car name must be at most 60 characters.' }),
+});
+
+export type CarRequest = z.infer<typeof carRequestSchema>;
 
 export interface Car extends CarRequest {
   id: number;
