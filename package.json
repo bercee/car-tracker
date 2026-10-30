@@ -42,6 +42,7 @@
   },
   "allowScripts": {
     "better-sqlite3@13.0.3": true,
-    "esbuild@0.28.2": true
+    "esbuild@0.28.2": true,
+    "@embedded-postgres/linux-x64@17.10.0-beta.17": true
   }
 }
