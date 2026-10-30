@@ -17,17 +17,42 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  migrate:
+    image: ghcr.io/OWNER/car-tracker-backend:${APP_VERSION:-main}
+    command: ['node', 'dist/migrate.js']
+    restart: 'no'
+    environment:
+      NODE_ENV: production
+      DB_HOST: ${DB_HOST:?set DB_HOST in .env}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:?set DB_NAME in .env}
+      DB_USER: ${DB_USER:?set DB_USER in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    networks:
+      - database
+    security_opt:
+      - no-new-privileges:true
+
   backend:
     image: ghcr.io/OWNER/car-tracker-backend:${APP_VERSION:-main}
     restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: '3000'
+      DB_HOST: ${DB_HOST:?set DB_HOST in .env}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:?set DB_NAME in .env}
+      DB_USER: ${DB_USER:?set DB_USER in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
     networks:
       proxy:
         aliases:
           - car-tracker-backend
+      database:
     expose:
       - '3000'
     security_opt:
@@ -37,3 +62,7 @@ networks:
   proxy:
     external: true
     name: reverse-proxy
+
+  database:
+    external: true
+    name: database
