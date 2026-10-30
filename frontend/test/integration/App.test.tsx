@@ -113,7 +113,7 @@ describe('App', () => {
         remark: 'Station',
       },
     ]);
-    api.getAdBlue.mockResolvedValue([{ id: 1, eventDate: '2026-09-18', odometerKm: 2, liters: '2.000', price: '500' }]);
+    api.getAdBlue.mockResolvedValue([{ id: 1, eventDate: '2026-09-18', odometerKm: 2, liters: 2, price: 500 }]);
     api.getExpenses.mockResolvedValue([
       { id: 1, eventDate: '2026-09-18', price: 1000, notes: 'Service' },
       { id: 2, eventDate: '2026-09-17', price: 500, notes: null },
@@ -160,7 +160,7 @@ describe('App', () => {
     await user.type(screen.getAllByLabelText('Liters').at(-1)!, '1');
     await user.type(screen.getAllByLabelText('Total price (HUF)').at(-1)!, '500.5');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
-    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF amount');
+    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF price');
 
     await user.click(screen.getByRole('tab', { name: 'Expenses' }));
     await screen.findByLabelText('Price (HUF)');
@@ -199,6 +199,60 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Save record' }));
     await waitFor(() =>
       expect(api.addExpense).toHaveBeenCalledWith(1, { eventDate: expect.any(String), price: 32_000, notes: null }),
+    );
+  });
+
+  it('blocks invalid AdBlue input without calling the API and treats empty number fields as missing', async () => {
+    defaults();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'AdBlue' }));
+    await screen.findAllByLabelText('Total price (HUF)');
+    const field = (label: string) => screen.getAllByLabelText(label).at(-1)!;
+    const save = async () => {
+      await user.click(screen.getByRole('button', { name: 'Save record' }));
+      return (await screen.findAllByRole('alert')).at(-1)!;
+    };
+    const fill = async (label: string, text: string) => {
+      await user.clear(field(label));
+      if (text !== '') await user.type(field(label), text);
+    };
+
+    await fill('Total price (HUF)', '500');
+    expect(await save()).toHaveTextContent('liters');
+    await fill('Liters', '1.2345');
+    expect(await save()).toHaveTextContent('liters');
+    await fill('Liters', '0');
+    expect(await save()).toHaveTextContent('liters');
+    await fill('Liters', '10000');
+    expect(await save()).toHaveTextContent('liters');
+    await fill('Liters', '5');
+    await fill('Total price (HUF)', '');
+    expect(await save()).toHaveTextContent('HUF price');
+    await fill('Total price (HUF)', '500');
+    await fill('Odometer (km)', '');
+    expect(await save()).toHaveTextContent('odometer');
+    expect(api.addAdBlue).not.toHaveBeenCalled();
+  });
+
+  it('sends AdBlue liters and Price as numbers and shows liters with three decimals', async () => {
+    defaults();
+    api.getAdBlue.mockResolvedValue([{ id: 1, eventDate: '2026-09-18', odometerKm: 2, liters: 2.5, price: 500 }]);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'AdBlue' }));
+    expect(await screen.findByText('2.500 L')).toBeInTheDocument();
+    await user.type(screen.getAllByLabelText('Liters').at(-1)!, '47.3');
+    await user.type(screen.getAllByLabelText('Total price (HUF)').at(-1)!, '7490');
+    await user.click(screen.getByRole('button', { name: 'Save record' }));
+    await waitFor(() =>
+      expect(api.addAdBlue).toHaveBeenCalledWith(1, {
+        eventDate: expect.any(String),
+        odometerKm: 0,
+        liters: 47.3,
+        price: 7490,
+      }),
     );
   });
 
@@ -333,7 +387,7 @@ describe('App', () => {
   it('maps AdBlue and expense records into their existing edit forms', async () => {
     defaults();
     api.getAdBlue.mockResolvedValue([
-      { id: 2, eventDate: '2026-09-17', odometerKm: 456, liters: '3.400', price: '789', createdAt: '' },
+      { id: 2, eventDate: '2026-09-17', odometerKm: 456, liters: 3.4, price: 789, createdAt: '' },
     ]);
     api.getExpenses.mockResolvedValue([{ id: 4, eventDate: '2026-09-16', price: 1200, notes: null, createdAt: '' }]);
     const user = userEvent.setup();
@@ -343,11 +397,15 @@ describe('App', () => {
     await user.click(await screen.findByRole('button', { name: 'Edit AdBlue record 2' }));
     expect(screen.getAllByLabelText('Date').at(-1)).toHaveValue('2026-09-17');
     expect(screen.getAllByLabelText('Odometer (km)').at(-1)).toHaveValue(456);
-    expect(screen.getAllByLabelText('Liters').at(-1)).toHaveValue('3.400');
+    expect(screen.getAllByLabelText('Liters').at(-1)).toHaveValue('3.4');
     expect(screen.getAllByLabelText('Total price (HUF)').at(-1)).toHaveValue('789');
     await user.click(screen.getByRole('button', { name: 'Update record' }));
     await waitFor(() =>
-      expect(api.updateAdBlue).toHaveBeenCalledWith(1, 2, expect.objectContaining({ liters: '3.400' })),
+      expect(api.updateAdBlue).toHaveBeenCalledWith(
+        1,
+        2,
+        expect.objectContaining({ liters: 3.4, price: 789, odometerKm: 456 }),
+      ),
     );
 
     await user.click(screen.getByRole('tab', { name: 'Expenses' }));

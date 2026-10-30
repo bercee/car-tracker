@@ -59,15 +59,15 @@ describe('Express API', () => {
     expect(listed.body).toEqual([created.body]);
   });
 
-  it('creates, canonicalizes, and lists an AdBlue record', async () => {
+  it('creates and lists an AdBlue record with numeric liters and price', async () => {
     const app = createApp(testDatabase.database, healthy, logger);
     expect((await request(app).get(`/api/cars/${carId}/adblue`)).body).toEqual([]);
 
     const created = await request(app).post(`/api/cars/${carId}/adblue`).send({
       eventDate: '2026-09-16',
       odometerKm: 82_500,
-      liters: '10',
-      price: '7490',
+      liters: 10,
+      price: 7490,
     });
 
     expect(created.status).toBe(201);
@@ -76,8 +76,8 @@ describe('Express API', () => {
       id: 1,
       eventDate: '2026-09-16',
       odometerKm: 82_500,
-      liters: '10.000',
-      price: '7490',
+      liters: 10,
+      price: 7490,
     });
     expect((await request(app).get(`/api/cars/${carId}/adblue`)).body).toEqual([created.body]);
   });
@@ -120,7 +120,7 @@ describe('Express API', () => {
         .expect(201);
       await request(app)
         .post(`/api/cars/${carId}/adblue`)
-        .send({ eventDate, odometerKm: index, liters: '1', price: '1000' })
+        .send({ eventDate, odometerKm: index, liters: 1, price: 1000 })
         .expect(201);
       await request(app).post(`/api/cars/${carId}/expenses`).send({ eventDate, price: 1000 }).expect(201);
     }
@@ -146,8 +146,8 @@ describe('Express API', () => {
       ],
       [
         `/api/cars/${carId}/adblue`,
-        { eventDate: '2026-09-15', odometerKm: 10, liters: '1', price: '100' },
-        { eventDate: '2026-09-16', odometerKm: 11, liters: '2', price: '200' },
+        { eventDate: '2026-09-15', odometerKm: 10, liters: 1, price: 100 },
+        { eventDate: '2026-09-16', odometerKm: 11, liters: 2, price: 200 },
       ],
       [
         `/api/cars/${carId}/expenses`,
@@ -182,7 +182,7 @@ describe('Express API', () => {
       { eventDate: 'bad' },
       { eventDate: '2026-09-15', odometerKm: 1, liters: '1', price: '1', fullTank: false },
     ],
-    ['adblue', [], { eventDate: '2026-09-15', odometerKm: 1, liters: '1', price: '1' }],
+    ['adblue', [], { eventDate: '2026-09-15', odometerKm: 1, liters: 1, price: 1 }],
     ['expenses', { eventDate: '2026-09-15', price: 1.5 }, { eventDate: '2026-09-15', price: 1 }],
   ])('rejects invalid PUT bodies without changing %s', async (resource, invalid, valid) => {
     const path = `/api/cars/${carId}/${resource}`;
@@ -241,7 +241,7 @@ describe('Express API', () => {
     const otherCarId = (await createCar(testDatabase.database, 'Other car')).id;
     const bodies = {
       fuel: { eventDate: '2026-09-15', odometerKm: 10, liters: '1', price: '100', fullTank: true },
-      adblue: { eventDate: '2026-09-15', odometerKm: 10, liters: '1', price: '100' },
+      adblue: { eventDate: '2026-09-15', odometerKm: 10, liters: 1, price: 100 },
       expenses: { eventDate: '2026-09-15', price: 100 },
     };
 
@@ -421,6 +421,68 @@ describe('Express API', () => {
       expect(rejected.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field });
       expect(rejected.body.error.message).toEqual(expect.any(String));
       await send(request(app).put(`${path()}/${created.body.id}`)).expect(400);
+      expect((await request(app).get(path())).body).toEqual([created.body]);
+    });
+  });
+
+  describe('AdBlue validation', () => {
+    const valid = { eventDate: '2026-09-16', odometerKm: 82_500, liters: 10, price: 7490 };
+    const path = () => `/api/cars/${carId}/adblue`;
+    const sendJson = (r: request.Test, body: unknown) =>
+      r.set('Content-Type', 'application/json').send(JSON.stringify(body));
+
+    it.each([
+      [47.3, 7490],
+      [0.001, 0],
+      [9999.999, 9_999_999],
+      [10, 1],
+    ])('round-trips liters %s and price %s exactly as numbers', async (liters, price) => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const created = await request(app)
+        .post(path())
+        .send({ ...valid, liters, price })
+        .expect(201);
+      expect(created.body).toMatchObject({ liters, price });
+      const listed = await request(app).get(path());
+      expect(listed.body[0]).toMatchObject({ liters, price });
+      expect(typeof listed.body[0].liters).toBe('number');
+    });
+
+    it('updates an AdBlue record with numbers', async () => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const created = await request(app).post(path()).send(valid).expect(201);
+      const updated = await request(app)
+        .put(`${path()}/${created.body.id}`)
+        .send({ ...valid, liters: 0.5, price: 300 })
+        .expect(200);
+      expect(updated.body).toMatchObject({ id: created.body.id, liters: 0.5, price: 300 });
+    });
+
+    it.each([
+      ['zero liters', { ...valid, liters: 0 }, 'liters'],
+      ['negative liters', { ...valid, liters: -1 }, 'liters'],
+      ['four decimal places', { ...valid, liters: 1.2345 }, 'liters'],
+      ['too-large liters', { ...valid, liters: 10_000 }, 'liters'],
+      ['string liters', { ...valid, liters: '10' }, 'liters'],
+      ['missing liters', { eventDate: valid.eventDate, odometerKm: 1, price: 1 }, 'liters'],
+      ['string price', { ...valid, price: '100' }, 'price'],
+      ['fractional price', { ...valid, price: 1.5 }, 'price'],
+      ['negative price', { ...valid, price: -1 }, 'price'],
+      ['too-large price', { ...valid, price: 10_000_000 }, 'price'],
+      ['negative odometer', { ...valid, odometerKm: -1 }, 'odometerKm'],
+      ['fractional odometer', { ...valid, odometerKm: 1.5 }, 'odometerKm'],
+      ['too-large odometer', { ...valid, odometerKm: 10_000_000 }, 'odometerKm'],
+      ['impossible date', { ...valid, eventDate: '2026-02-30' }, 'eventDate'],
+      ['unknown key', { ...valid, extra: null }, 'body'],
+      ['array body', [], 'body'],
+      ['null body', null, 'body'],
+    ])('rejects %s', async (_name, body, field) => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const created = await request(app).post(path()).send(valid).expect(201);
+
+      const rejected = await sendJson(request(app).post(path()), body).expect(400);
+      expect(rejected.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field });
+      await sendJson(request(app).put(`${path()}/${created.body.id}`), body).expect(400);
       expect((await request(app).get(path())).body).toEqual([created.body]);
     });
   });

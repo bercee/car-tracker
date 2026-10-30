@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { validateAdBlueRequest } from '../../src/validation/adblue.js';
 import { validateFuelRequest } from '../../src/validation/fuel.js';
 
 const validFuel = {
@@ -67,28 +66,5 @@ describe('fuel validation', () => {
     };
     expect(() => validateFuelRequest(missingLiters)).toThrow('liters is required');
     expect(() => validateFuelRequest([])).toThrow('body must be a plain JSON object');
-  });
-});
-
-describe('AdBlue validation', () => {
-  const valid = { eventDate: '2026-09-15', odometerKm: 82_450, liters: '10', price: '7490' };
-
-  it('validates and converts a request', () => {
-    expect(validateAdBlueRequest(valid)).toEqual({
-      eventDate: '2026-09-15',
-      odometerKm: 82_450,
-      litersMilliliters: 10_000,
-      priceHuf: 7490,
-    });
-  });
-
-  it.each([
-    [{ ...valid, eventDate: '2026-02-30' }, 'eventDate must be a real calendar date'],
-    [{ ...valid, liters: '10000' }, 'liters exceeds the maximum allowed value'],
-    [{ ...valid, price: '10000000' }, 'price exceeds the maximum allowed value'],
-    [{ ...valid, price: '7490.5' }, 'price must be a canonical whole-number HUF amount'],
-    [{ ...valid, extra: null }, 'extra is not allowed'],
-  ])('rejects invalid input', (input, message) => {
-    expect(() => validateAdBlueRequest(input)).toThrow(message);
   });
 });

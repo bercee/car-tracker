@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapAdBlueRow, mapCarRow, mapFuelRow } from '../../src/database/mappers.js';
+import { mapCarRow, mapFuelRow } from '../../src/database/mappers.js';
 
 const createdAt = new Date('2026-09-16T12:34:56.789Z');
 
@@ -36,19 +36,5 @@ describe('database row mappers', () => {
       fullTank: true,
       remark: 'Shell',
     });
-  });
-
-  it('maps an AdBlue row with liters padded and price in whole HUF', () => {
-    expect(
-      mapAdBlueRow({
-        id: 2,
-        carId: 1,
-        eventDate: '2026-09-15',
-        createdAt,
-        odometerKm: 82_450,
-        litersMilliliters: 10_000,
-        priceHuf: 7490,
-      }),
-    ).toMatchObject({ id: 2, liters: '10.000', price: '7490' });
   });
 });

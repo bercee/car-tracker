@@ -72,9 +72,11 @@ describe('baseline migration on an empty PostgreSQL database', () => {
     }
     for (const table of ['fuel', 'adblue']) {
       expect(typeOf(table, 'odometer_km')).toBe('integer');
-      expect(typeOf(table, 'liters_milliliters')).toBe('integer');
-      expect(typeOf(table, 'price_huf')).toBe('integer');
     }
+    expect(typeOf('fuel', 'liters_milliliters')).toBe('integer');
+    expect(typeOf('fuel', 'price_huf')).toBe('integer');
+    expect(typeOf('adblue', 'liters')).toBe('numeric');
+    expect(typeOf('adblue', 'price')).toBe('integer');
     expect(typeOf('fuel', 'full_tank')).toBe('boolean');
     expect(typeOf('expenses', 'price')).toBe('integer');
 
@@ -134,15 +136,18 @@ describe('baseline migration on an empty PostgreSQL database', () => {
 
   it('enforces the AdBlue CHECKs', async () => {
     const carId = await insertCar('AdBlue checks');
-    const insertAdBlue = `INSERT INTO adblue (car_id, event_date, odometer_km, liters_milliliters, price_huf)
+    const insertAdBlue = `INSERT INTO adblue (car_id, event_date, odometer_km, liters, price)
       VALUES ($1, $2, $3, $4, $5)`;
-    const ok = [carId, '2026-09-17', 1, 1000, 100];
+    const ok = [carId, '2026-09-17', 1, 1.5, 100];
     const withValue = (index: number, value: unknown) => ok.map((entry, i) => (i === index ? value : entry));
 
     await expect(client.query(insertAdBlue, ok)).resolves.toMatchObject({ rowCount: 1 });
     await expectViolation(insertAdBlue, withValue(1, 'invalid'), '22007');
     await expectViolation(insertAdBlue, withValue(2, -1), '23514');
     await expectViolation(insertAdBlue, withValue(3, 0), '23514');
+    await expectViolation(insertAdBlue, withValue(3, -1), '23514');
+    await expectViolation(insertAdBlue, withValue(3, 10_000), '22003');
+    await expect(client.query(insertAdBlue, withValue(3, 9999.999))).resolves.toMatchObject({ rowCount: 1 });
     await expectViolation(insertAdBlue, withValue(4, -1), '23514');
   });
 
@@ -178,7 +183,7 @@ describe('baseline migration on an empty PostgreSQL database', () => {
       [carId, '2026-09-17'],
     );
     await client.query(
-      'INSERT INTO adblue (car_id, event_date, odometer_km, liters_milliliters, price_huf) VALUES ($1, $2, 1, 1000, 1)',
+      'INSERT INTO adblue (car_id, event_date, odometer_km, liters, price) VALUES ($1, $2, 1, 1000, 1)',
       [carId, '2026-09-17'],
     );
     await client.query('INSERT INTO expenses (car_id, event_date, price) VALUES ($1, $2, 1)', [carId, '2026-09-17']);

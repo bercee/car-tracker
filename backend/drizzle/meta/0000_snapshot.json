@@ -1,5 +1,5 @@
 {
-  "id": "fae95377-f75d-4ba1-8476-8fb6dbf32443",
+  "id": "4e2ef087-c593-4212-9bd0-bcdec8f4e675",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -50,14 +50,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "liters_milliliters": {
-          "name": "liters_milliliters",
-          "type": "integer",
+        "liters": {
+          "name": "liters",
+          "type": "numeric(7, 3)",
           "primaryKey": false,
           "notNull": true
         },
-        "price_huf": {
-          "name": "price_huf",
+        "price": {
+          "name": "price",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -115,13 +115,13 @@
           "name": "adblue_odometer_km_nonnegative",
           "value": "\"adblue\".\"odometer_km\" >= 0"
         },
-        "adblue_liters_milliliters_positive": {
-          "name": "adblue_liters_milliliters_positive",
-          "value": "\"adblue\".\"liters_milliliters\" > 0"
+        "adblue_liters_positive": {
+          "name": "adblue_liters_positive",
+          "value": "\"adblue\".\"liters\" > 0"
         },
-        "adblue_price_huf_nonnegative": {
-          "name": "adblue_price_huf_nonnegative",
-          "value": "\"adblue\".\"price_huf\" >= 0"
+        "adblue_price_nonnegative": {
+          "name": "adblue_price_nonnegative",
+          "value": "\"adblue\".\"price\" >= 0"
         }
       },
       "isRLSEnabled": false

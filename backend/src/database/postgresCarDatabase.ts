@@ -2,8 +2,8 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import pg from 'pg';
 
 import type {
-  AdBlueInput,
   AdBlueRecord,
+  AdBlueRequest,
   Car,
   CarRequest,
   ExpenseRecord,
@@ -90,7 +90,7 @@ export class PostgresCarDatabase implements CarDatabase {
     return rows.length === 1;
   }
 
-  async addAdBlue(carId: number, input: AdBlueInput): Promise<AdBlueRecord> {
+  async addAdBlue(carId: number, input: AdBlueRequest): Promise<AdBlueRecord> {
     const [row] = await this.#db
       .insert(adblue)
       .values({ carId, ...input })
@@ -107,7 +107,7 @@ export class PostgresCarDatabase implements CarDatabase {
     return rows.map(mapAdBlueRow);
   }
 
-  async updateAdBlue(carId: number, id: number, input: AdBlueInput): Promise<AdBlueRecord | undefined> {
+  async updateAdBlue(carId: number, id: number, input: AdBlueRequest): Promise<AdBlueRecord | undefined> {
     const [row] = await this.#db
       .update(adblue)
       .set(input)

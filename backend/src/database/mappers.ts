@@ -34,8 +34,8 @@ export function mapAdBlueRow(row: AdBlueRow): AdBlueRecord {
     eventDate: row.eventDate,
     createdAt: row.createdAt.toISOString(),
     odometerKm: row.odometerKm,
-    liters: formatScaledInteger(row.litersMilliliters, 3),
-    price: formatHufAmount(row.priceHuf),
+    liters: row.liters,
+    price: row.price,
   };
 }
 

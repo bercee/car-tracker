@@ -17,10 +17,3 @@ export interface FuelInput {
   fullTank: boolean;
   remark: string | null;
 }
-
-export interface AdBlueInput {
-  eventDate: string;
-  odometerKm: number;
-  litersMilliliters: number;
-  priceHuf: number;
-}

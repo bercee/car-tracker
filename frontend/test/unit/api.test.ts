@@ -48,7 +48,7 @@ describe('api client', () => {
     expect(fetchMock).toHaveBeenLastCalledWith('/api/cars/7/adblue', expect.anything());
     await getExpenses(7);
     expect(fetchMock).toHaveBeenLastCalledWith('/api/cars/7/expenses', expect.anything());
-    await addAdBlue(7, { eventDate: '2026-09-18', odometerKm: 1, liters: '1', price: '1' });
+    await addAdBlue(7, { eventDate: '2026-09-18', odometerKm: 1, liters: 1, price: 1 });
     expect(fetchMock).toHaveBeenLastCalledWith('/api/cars/7/adblue', expect.objectContaining({ method: 'POST' }));
     await addExpense(7, { eventDate: '2026-09-18', price: 1, notes: null });
     expect(fetchMock).toHaveBeenLastCalledWith('/api/cars/7/expenses', expect.objectContaining({ method: 'POST' }));
@@ -89,7 +89,7 @@ describe('api client', () => {
       }),
     );
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ id: 5 }), { status: 200 }));
-    await updateAdBlue(2, 5, { eventDate: '2026-09-18', odometerKm: 1, liters: '1', price: '1' });
+    await updateAdBlue(2, 5, { eventDate: '2026-09-18', odometerKm: 1, liters: 1, price: 1 });
     expect(fetchMock).toHaveBeenLastCalledWith('/api/cars/2/adblue/5', expect.objectContaining({ method: 'PUT' }));
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
     await expect(deleteAdBlue(2, 5)).resolves.toBeUndefined();

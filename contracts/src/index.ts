@@ -15,13 +15,6 @@ export interface FuelRequest {
   remark?: string | null;
 }
 
-export interface AdBlueRequest {
-  eventDate: string;
-  odometerKm: number;
-  liters: string;
-  price: string;
-}
-
 export const dateSchema = z.iso.date({ error: 'Enter a valid date.' });
 
 const PRICE_MESSAGE = 'Enter a whole HUF price from 0 to 9,999,999.';
@@ -39,6 +32,28 @@ export const optionalText = (maxLength: number, label: string) =>
     .max(maxLength, { error: `${label} must be at most ${maxLength} characters.` })
     .nullish()
     .transform((value) => value || null);
+
+const LITERS_MESSAGE = 'Enter liters above 0 and up to 9,999.999, with at most three decimal places.';
+export const litersSchema = z
+  .number({ error: LITERS_MESSAGE })
+  .positive({ error: LITERS_MESSAGE })
+  .max(9_999.999, { error: LITERS_MESSAGE })
+  .multipleOf(0.001, { error: LITERS_MESSAGE });
+
+const ODOMETER_MESSAGE = 'Enter an odometer value from 0 to 9,999,999 km.';
+export const odometerSchema = z
+  .number({ error: ODOMETER_MESSAGE })
+  .int({ error: ODOMETER_MESSAGE })
+  .min(0, { error: ODOMETER_MESSAGE })
+  .max(9_999_999, { error: ODOMETER_MESSAGE });
+
+export const adBlueRequestSchema = z.strictObject({
+  eventDate: dateSchema,
+  odometerKm: odometerSchema,
+  liters: litersSchema,
+  price: priceSchema,
+});
+export type AdBlueRequest = z.infer<typeof adBlueRequestSchema>;
 
 export const expenseRequestSchema = z.strictObject({
   eventDate: dateSchema,

@@ -8,4 +8,4 @@ export const formatMoney = (value: string | number) =>
     Number(value),
   );
 
-export const formatLiters = (value: string) => `${Number(value).toFixed(3)} L`;
+export const formatLiters = (value: number | string) => `${Number(value).toFixed(3)} L`;

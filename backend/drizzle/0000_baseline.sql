@@ -4,11 +4,11 @@ CREATE TABLE "adblue" (
 	"event_date" date NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"odometer_km" integer NOT NULL,
-	"liters_milliliters" integer NOT NULL,
-	"price_huf" integer NOT NULL,
+	"liters" numeric(7, 3) NOT NULL,
+	"price" integer NOT NULL,
 	CONSTRAINT "adblue_odometer_km_nonnegative" CHECK ("adblue"."odometer_km" >= 0),
-	CONSTRAINT "adblue_liters_milliliters_positive" CHECK ("adblue"."liters_milliliters" > 0),
-	CONSTRAINT "adblue_price_huf_nonnegative" CHECK ("adblue"."price_huf" >= 0)
+	CONSTRAINT "adblue_liters_positive" CHECK ("adblue"."liters" > 0),
+	CONSTRAINT "adblue_price_nonnegative" CHECK ("adblue"."price" >= 0)
 );
 --> statement-breakpoint
 CREATE TABLE "cars" (

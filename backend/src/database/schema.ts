@@ -1,5 +1,16 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, date, index, integer, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  date,
+  index,
+  integer,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 
 export const carNameUniqueIndex = 'cars_name_lower_key';
 
@@ -55,8 +66,8 @@ export const adblue = pgTable(
     eventDate: eventDate(),
     createdAt: createdAt(),
     odometerKm: integer('odometer_km').notNull(),
-    litersMilliliters: integer('liters_milliliters').notNull(),
-    priceHuf: integer('price_huf').notNull(),
+    liters: numeric({ precision: 7, scale: 3, mode: 'number' }).notNull(),
+    price: integer().notNull(),
   },
   (table) => [
     index('idx_adblue_car_event_date').on(
@@ -65,8 +76,8 @@ export const adblue = pgTable(
       table.id.desc().nullsFirst(),
     ),
     check('adblue_odometer_km_nonnegative', sql`${table.odometerKm} >= 0`),
-    check('adblue_liters_milliliters_positive', sql`${table.litersMilliliters} > 0`),
-    check('adblue_price_huf_nonnegative', sql`${table.priceHuf} >= 0`),
+    check('adblue_liters_positive', sql`${table.liters} > 0`),
+    check('adblue_price_nonnegative', sql`${table.price} >= 0`),
   ],
 );
 
