@@ -10,10 +10,14 @@ import type {
   FuelRequest,
 } from '@car-tracker/contracts';
 
+/** Why a request failed: no usable response, HTTP 404, or any other error response. */
+export type ApiErrorKind = 'network' | 'not-found' | 'rejected';
+
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly field?: string,
+    readonly kind: ApiErrorKind = 'rejected',
   ) {
     super(message);
     this.name = 'ApiError';
@@ -32,16 +36,20 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     });
     if (response.status === 204) return undefined as T;
     const body: unknown = await response.json().catch(() => {
-      throw new ApiError('The server returned an invalid response.');
+      throw new ApiError('The server returned an invalid response.', undefined, 'network');
     });
     if (!response.ok) {
       const envelope = body as Partial<ErrorEnvelope>;
-      throw new ApiError(envelope.error?.message ?? 'The request could not be completed.', envelope.error?.field);
+      throw new ApiError(
+        envelope.error?.message ?? 'The request could not be completed.',
+        envelope.error?.field,
+        response.status === 404 ? 'not-found' : 'rejected',
+      );
     }
     return body as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    throw new ApiError('Unable to reach the server. Please try again.');
+    throw new ApiError('Unable to reach the server. Please try again.', undefined, 'network');
   }
 }
 const get = <T>(path: string) => request<T>(path);
