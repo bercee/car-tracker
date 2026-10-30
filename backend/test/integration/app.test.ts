@@ -28,7 +28,7 @@ describe('Express API', () => {
   });
 
   it('creates, canonicalizes, and lists a fuel record', async () => {
-    const app = createApp(testDatabase.database, logger, healthy);
+    const app = createApp(testDatabase.database, healthy, logger);
     const empty = await request(app).get(`/api/cars/${carId}/fuel`);
     expect(empty.status).toBe(200);
     expect(empty.body).toEqual([]);
@@ -60,7 +60,7 @@ describe('Express API', () => {
   });
 
   it('creates, canonicalizes, and lists an AdBlue record', async () => {
-    const app = createApp(testDatabase.database, logger, healthy);
+    const app = createApp(testDatabase.database, healthy, logger);
     expect((await request(app).get(`/api/cars/${carId}/adblue`)).body).toEqual([]);
 
     const created = await request(app).post(`/api/cars/${carId}/adblue`).send({
@@ -83,7 +83,7 @@ describe('Express API', () => {
   });
 
   it('creates, canonicalizes, and lists an expense record', async () => {
-    const app = createApp(testDatabase.database, logger, healthy);
+    const app = createApp(testDatabase.database, healthy, logger);
     expect((await request(app).get(`/api/cars/${carId}/expenses`)).body).toEqual([]);
 
     const created = await request(app).post(`/api/cars/${carId}/expenses`).send({
@@ -104,7 +104,7 @@ describe('Express API', () => {
   });
 
   it('sorts every resource by event date and then id descending', async () => {
-    const app = createApp(testDatabase.database, logger, healthy);
+    const app = createApp(testDatabase.database, healthy, logger);
     const dates = ['2026-01-01', '2026-02-01', '2026-02-01'];
 
     for (const [index, eventDate] of dates.entries()) {
@@ -137,7 +137,7 @@ describe('Express API', () => {
   });
 
   it('updates and deletes every resource and returns field-level member errors', async () => {
-    const app = createApp(testDatabase.database, logger, healthy);
+    const app = createApp(testDatabase.database, healthy, logger);
     const specs = [
       [
         `/api/cars/${carId}/fuel`,
@@ -186,7 +186,7 @@ describe('Express API', () => {
     ['expenses', { eventDate: '2026-09-15', amount: '1.5' }, { eventDate: '2026-09-15', amount: '1' }],
   ])('rejects invalid PUT bodies without changing %s', async (resource, invalid, valid) => {
     const path = `/api/cars/${carId}/${resource}`;
-    const app = createApp(testDatabase.database, logger, healthy);
+    const app = createApp(testDatabase.database, healthy, logger);
     const created = await request(app).post(path).send(valid).expect(201);
     const rejected = await request(app).put(`${path}/${created.body.id}`).send(invalid).expect(400);
     expect(rejected.body.error.code).toBe('VALIDATION_ERROR');
@@ -199,7 +199,7 @@ describe('Express API', () => {
     ['expenses', { eventDate: '2026-09-17', amount: '1.5' }],
   ])('rejects invalid input without writing a row for %s', async (resource, body) => {
     const path = `/api/cars/${carId}/${resource}`;
-    const app = createApp(testDatabase.database, logger, healthy);
+    const app = createApp(testDatabase.database, healthy, logger);
     const rejected = await request(app).post(path).send(body);
 
     expect(rejected.status).toBe(400);
@@ -208,7 +208,7 @@ describe('Express API', () => {
   });
 
   it('requires JSON for POST requests', async () => {
-    const app = createApp(testDatabase.database, logger, healthy);
+    const app = createApp(testDatabase.database, healthy, logger);
     const response = await request(app).post(`/api/cars/${carId}/fuel`).type('form').send('eventDate=2026-09-17');
 
     expect(response.status).toBe(415);
@@ -221,7 +221,7 @@ describe('Express API', () => {
   });
 
   it('requires JSON for PUT and accepts bodyless DELETE without a content type', async () => {
-    const app = createApp(testDatabase.database, logger, healthy);
+    const app = createApp(testDatabase.database, healthy, logger);
     const created = await request(app)
       .post(`/api/cars/${carId}/expenses`)
       .send({ eventDate: '2026-09-17', amount: '10' })
@@ -237,7 +237,7 @@ describe('Express API', () => {
   });
 
   it('scopes records to the car in the URL', async () => {
-    const app = createApp(testDatabase.database, logger, healthy);
+    const app = createApp(testDatabase.database, healthy, logger);
     const otherCarId = (await createCar(testDatabase.database, 'Other car')).id;
     const bodies = {
       fuel: { eventDate: '2026-09-15', odometerKm: 10, liters: '1', price: '100', fullTank: true },
@@ -259,7 +259,7 @@ describe('Express API', () => {
   });
 
   it('validates the car id before the record id and the body', async () => {
-    const app = createApp(testDatabase.database, logger, healthy);
+    const app = createApp(testDatabase.database, healthy, logger);
 
     const unknown = await request(app).get('/api/cars/999/fuel').expect(404);
     expect(unknown.body.error).toEqual({ code: 'NOT_FOUND', message: 'Car not found', field: 'carId' });
@@ -276,7 +276,7 @@ describe('Express API', () => {
   });
 
   it('no longer serves the un-nested record routes', async () => {
-    const app = createApp(testDatabase.database, logger, healthy);
+    const app = createApp(testDatabase.database, healthy, logger);
 
     for (const resource of ['fuel', 'adblue', 'expenses']) {
       const response = await request(app).get(`/api/${resource}`).expect(404);
@@ -285,14 +285,14 @@ describe('Express API', () => {
   });
 
   it('returns 404 for an unknown POST before applying resource body rules', async () => {
-    const response = await request(createApp(testDatabase.database, logger, healthy)).post('/api/unknown');
+    const response = await request(createApp(testDatabase.database, healthy, logger)).post('/api/unknown');
 
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe('NOT_FOUND');
   });
 
   it('returns a standard 413 response for bodies above 16 KB', async () => {
-    const app = createApp(testDatabase.database, logger, healthy);
+    const app = createApp(testDatabase.database, healthy, logger);
     const response = await request(app)
       .post(`/api/cars/${carId}/expenses`)
       .set('Content-Type', 'application/json')
@@ -318,7 +318,7 @@ describe('Express API', () => {
   });
 
   it('returns a standard 400 response for malformed JSON', async () => {
-    const response = await request(createApp(testDatabase.database, logger, healthy))
+    const response = await request(createApp(testDatabase.database, healthy, logger))
       .post(`/api/cars/${carId}/expenses`)
       .set('Content-Type', 'application/json')
       .send('{');
@@ -332,7 +332,7 @@ describe('Express API', () => {
   });
 
   it('returns a JSON 404 for unknown API routes', async () => {
-    const response = await request(createApp(testDatabase.database, logger, healthy)).get('/api/unknown');
+    const response = await request(createApp(testDatabase.database, healthy, logger)).get('/api/unknown');
 
     expect(response.status).toBe(404);
     expect(response.headers['content-type']).toMatch(/^application\/json/);
@@ -344,7 +344,7 @@ describe('Express API', () => {
   it('sanitizes and logs internal failures', async () => {
     vi.spyOn(testDatabase.database, 'listFuel').mockRejectedValue(new Error('SQL statement and private path'));
 
-    const response = await request(createApp(testDatabase.database, logger, healthy)).get(`/api/cars/${carId}/fuel`);
+    const response = await request(createApp(testDatabase.database, healthy, logger)).get(`/api/cars/${carId}/fuel`);
 
     expect(response.status).toBe(500);
     expect(response.body).toEqual({
@@ -360,13 +360,13 @@ describe('Express API', () => {
 
     it('returns an empty list on a fresh database', async () => {
       await testDatabase.reset();
-      const response = await request(createApp(testDatabase.database, logger, healthy)).get('/api/cars');
+      const response = await request(createApp(testDatabase.database, healthy, logger)).get('/api/cars');
       expect(response.status).toBe(200);
       expect(response.body).toEqual([]);
     });
 
     it('creates a car with a trimmed name and lists cars sorted by name', async () => {
-      const app = createApp(testDatabase.database, logger, healthy);
+      const app = createApp(testDatabase.database, healthy, logger);
 
       const created = await postCar(app, '  alpha  ');
       expect(created.status).toBe(201);
@@ -380,7 +380,7 @@ describe('Express API', () => {
     });
 
     it('rejects duplicate names, case-insensitively, with 409 CONFLICT', async () => {
-      const app = createApp(testDatabase.database, logger, healthy);
+      const app = createApp(testDatabase.database, healthy, logger);
 
       for (const name of ['Test car', 'TEST CAR']) {
         const response = await postCar(app, name);
@@ -393,7 +393,7 @@ describe('Express API', () => {
     });
 
     it('renames a car without affecting its records', async () => {
-      const app = createApp(testDatabase.database, logger, healthy);
+      const app = createApp(testDatabase.database, healthy, logger);
       await request(app)
         .post(`/api/cars/${carId}/expenses`)
         .send({ eventDate: '2026-09-17', amount: '15000' })
@@ -410,7 +410,7 @@ describe('Express API', () => {
     });
 
     it('allows renaming a car to its own name in a different case', async () => {
-      const response = await request(createApp(testDatabase.database, logger, healthy))
+      const response = await request(createApp(testDatabase.database, healthy, logger))
         .put(`/api/cars/${carId}`)
         .send({ name: 'TEST CAR' });
 
@@ -419,7 +419,7 @@ describe('Express API', () => {
     });
 
     it("rejects renaming to another car's name with 409", async () => {
-      const app = createApp(testDatabase.database, logger, healthy);
+      const app = createApp(testDatabase.database, healthy, logger);
       const other = await postCar(app, 'Other');
 
       const response = await request(app).put(`/api/cars/${other.body.id}`).send({ name: 'test car' });
@@ -433,7 +433,7 @@ describe('Express API', () => {
     });
 
     it('returns 404 when renaming an unknown car', async () => {
-      const response = await request(createApp(testDatabase.database, logger, healthy))
+      const response = await request(createApp(testDatabase.database, healthy, logger))
         .put('/api/cars/999')
         .send({ name: 'Ghost' });
 
@@ -444,7 +444,7 @@ describe('Express API', () => {
     });
 
     it('returns 400 for an invalid carId on rename', async () => {
-      const response = await request(createApp(testDatabase.database, logger, healthy))
+      const response = await request(createApp(testDatabase.database, healthy, logger))
         .put('/api/cars/abc')
         .send({ name: 'X' });
 
@@ -453,7 +453,7 @@ describe('Express API', () => {
     });
 
     it('rejects empty and over-long names with 400', async () => {
-      const app = createApp(testDatabase.database, logger, healthy);
+      const app = createApp(testDatabase.database, healthy, logger);
 
       for (const name of ['   ', 'x'.repeat(61)]) {
         const created = await postCar(app, name);
@@ -466,7 +466,7 @@ describe('Express API', () => {
     });
 
     it('requires JSON for POST and PUT', async () => {
-      const app = createApp(testDatabase.database, logger, healthy);
+      const app = createApp(testDatabase.database, healthy, logger);
 
       const created = await request(app).post('/api/cars').set('Content-Type', 'text/plain').send('name');
       const renamed = await request(app).put(`/api/cars/${carId}`).set('Content-Type', 'text/plain').send('name');
@@ -478,7 +478,7 @@ describe('Express API', () => {
     });
 
     it('has no DELETE route and does not shadow nested record routes', async () => {
-      const app = createApp(testDatabase.database, logger, healthy);
+      const app = createApp(testDatabase.database, healthy, logger);
 
       const deleted = await request(app).delete(`/api/cars/${carId}`);
       expect(deleted.status).toBe(404);

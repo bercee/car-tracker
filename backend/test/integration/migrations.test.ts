@@ -9,8 +9,6 @@ import { runMigrations } from '../../src/migrations.js';
 import type { TestPostgres } from '../helpers/testPostgres.js';
 import { startTestPostgres } from '../helpers/testPostgres.js';
 
-const shippedMigrations = path.join(import.meta.dirname, '../../drizzle');
-
 function writeMigrationFolder(directory: string, sql: string): string {
   mkdirSync(path.join(directory, 'meta'), { recursive: true });
   writeFileSync(path.join(directory, '0000_broken.sql'), sql);
@@ -63,8 +61,8 @@ describe('runMigrations', () => {
   });
 
   it('migrates an empty database, and applying again is a no-op', async () => {
-    await runMigrations(postgres.config, shippedMigrations);
-    await runMigrations(postgres.config, shippedMigrations);
+    await runMigrations(postgres.config);
+    await runMigrations(postgres.config);
 
     expect(await tableNames()).toEqual(expect.arrayContaining(['adblue', 'cars', 'expenses', 'fuel']));
   });

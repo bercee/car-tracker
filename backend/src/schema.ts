@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { boolean, check, date, index, integer, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
+export const carNameUniqueIndex = 'cars_name_lower_key';
+
 const id = () => integer().primaryKey().generatedAlwaysAsIdentity();
 const createdAt = () => timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow();
 const eventDate = () => date('event_date', { mode: 'string' }).notNull();
@@ -13,7 +15,8 @@ export const cars = pgTable(
     createdAt: createdAt(),
   },
   (table) => [
-    uniqueIndex('cars_name_lower_key').on(sql`lower(${table.name})`),
+    // COLLATE "C" folds only ASCII, independent of the database locale (matches SQLite NOCASE and the frontend).
+    uniqueIndex(carNameUniqueIndex).on(sql`lower(${table.name} COLLATE "C")`),
     check('cars_name_length', sql`char_length(${table.name}) BETWEEN 1 AND 60`),
   ],
 );

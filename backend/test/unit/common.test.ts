@@ -13,7 +13,6 @@ import {
   parseRecordId,
   requireExactKeys,
   requirePlainObject,
-  toSafeInteger,
 } from '../../src/validation/common.js';
 
 describe('calendar date validation', () => {
@@ -136,22 +135,20 @@ describe('common input helpers', () => {
 describe('storage formatting', () => {
   it.each([
     [0, 2, '0.00'],
-    [1n, 3, '0.001'],
+    [1, 3, '0.001'],
     [1600, 3, '1.600'],
-    [9_999_999n, 3, '9999.999'],
+    [9_999_999, 3, '9999.999'],
   ])('formats %s at scale %i', (value, scale, expected) => {
     expect(formatScaledInteger(value, scale)).toBe(expected);
   });
 
-  it('rejects unsafe or negative storage integers', () => {
-    expect(() => toSafeInteger(BigInt(Number.MAX_SAFE_INTEGER) + 1n, 'id')).toThrow(RangeError);
-    expect(() => toSafeInteger(1.5, 'id')).toThrow(RangeError);
+  it('rejects negative storage integers', () => {
     expect(() => formatScaledInteger(-1, 2)).toThrow('stored decimal must not be negative');
   });
 
   it('formats whole HUF amounts and rejects invalid storage', () => {
     expect(formatHufAmount(0)).toBe('0');
-    expect(formatHufAmount(619n)).toBe('619');
+    expect(formatHufAmount(619)).toBe('619');
     expect(() => formatHufAmount(-1)).toThrow('stored HUF amount must not be negative');
   });
 });

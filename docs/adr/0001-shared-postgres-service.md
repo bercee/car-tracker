@@ -8,7 +8,7 @@ The shared server is operated from the home-server deployment repo (`bercee/dock
 
 ## Consequences
 
-- Backup and restore automation is deliberately deferred. It must be designed before the database holds data that needs to be retained; per-app restore will be possible with `pg_dump` of one database.
+- Backup and restore automation is deliberately deferred. It must be designed before the database holds data that needs to be retained; per-app restore is possible with `pg_dump` of one database. Until then, the README documents a manual `pg_dump` and restore to run before each release.
 - Postgres being down takes every dependent app down; the backend health check must reflect database reachability.
 - Provisioning a new app needs a one-time `CREATE ROLE` / `CREATE DATABASE` in the shared-service deployment, following the Shared Postgres README.
 - The `./data` volume and `DATABASE_PATH` configuration go away. The backend receives separately validated `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` values, rather than a connection URL.

@@ -235,8 +235,9 @@ the deployment directory. This removes containers; the data stays in PostgreSQL.
 
 ### Local production-stack test
 
-`deploy/compose.local.yml` builds both application images from this checkout
-and runs a local HTTP-only Nginx proxy. It does not use GHCR, your external
+`deploy/compose.local.yml` builds both application images from this checkout,
+starts a throwaway PostgreSQL 17 container, runs the `migrate` step, and runs a
+local HTTP-only Nginx proxy. It does not use GHCR, your external
 proxy network, TLS, or Basic Auth. Only the proxy binds a host port, and it is
 limited to `127.0.0.1:8080`.
 
@@ -305,7 +306,8 @@ docker login ghcr.io
    docker pull ghcr.io/OWNER/car-tracker-backend:sha-<full-commit-sha>
    ```
 
-4. Back up the database before any schema-changing release.
+4. Back up the database before any schema-changing release (see
+   [Backup and restore](#backup-and-restore)).
 5. Set `APP_VERSION=sha-<full-commit-sha>` in the deployment directory's
    private `.env`; never use the mutable `main` tag for a release.
 6. Run `docker compose pull && docker compose up -d`, then inspect
@@ -325,12 +327,35 @@ gh workflow run ci.yml --ref v1.0.0
 After its workflow completes, verify that the semantic tags and that commit's
 `sha-<full-commit-sha>` tag resolve to the same image digest for each package.
 
-### Backup, rollback, and troubleshooting
+### Backup and restore
+
+Backups are manual until automation is designed (see
+[ADR 0001](docs/adr/0001-shared-postgres-service.md)). Run this on the home
+server before the PostgreSQL cutover and before any schema-changing release,
+replacing `<postgres-container>` with the shared PostgreSQL container's name.
+It writes a compressed dump of only the `car_tracker` database:
+
+```bash
+docker exec <postgres-container> pg_dump -U car_tracker -d car_tracker -Fc > car-tracker-$(date +%F).dump
+```
+
+Keep the dump off the server too, and check it is readable with
+`pg_restore --list car-tracker-<date>.dump`. To restore, stop the backend, then
+replace the database contents from the dump:
+
+```bash
+docker compose stop backend
+docker exec -i <postgres-container> pg_restore -U car_tracker -d car_tracker --clean --if-exists --no-owner < car-tracker-<date>.dump
+docker compose up -d
+```
+
+### Rollback and troubleshooting
 
 To roll back across the PostgreSQL cutover, restore the previous compose file
 (with its `/data` mount) and the prior immutable SHA in `.env`. The SQLite file
 is never read or deleted by the application: keep it until the cutover is
-verified, then delete it by hand. Migrations are not reverted automatically. To
+verified, then delete it by hand. Migrations are not reverted automatically;
+restore the pre-release dump if a schema change must be undone. To
 roll back an ordinary release, restore the prior SHA in `.env` and run:
 
 ```bash

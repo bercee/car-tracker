@@ -3,7 +3,7 @@ export interface ClosableServer {
 }
 
 export interface Closable {
-  close(): void | Promise<void>;
+  close(): Promise<void>;
 }
 
 export interface ShutdownOptions {
@@ -23,20 +23,22 @@ export function createShutdownCoordinator(
   let shutdown: Promise<void> | undefined;
 
   return (signal) => {
-    shutdown ??= closeServer(server)
-      .then(async () => {
-        await database.close();
-        exit(0);
-      })
-      .catch(async (error: unknown) => {
+    shutdown ??= (async () => {
+      let code = 0;
+      try {
+        await closeServer(server);
+      } catch (error: unknown) {
         logger.error(`Failed to shut down after ${signal}`, error);
-        try {
-          await database.close();
-        } catch (closeError: unknown) {
-          logger.error('Failed to close database during shutdown', closeError);
-        }
-        exit(1);
-      });
+        code = 1;
+      }
+      try {
+        await database.close();
+      } catch (error: unknown) {
+        logger.error('Failed to close database during shutdown', error);
+        code = 1;
+      }
+      exit(code);
+    })();
 
     return shutdown;
   };

@@ -1,4 +1,5 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
+import pg from 'pg';
 
 import type {
   AdBlueInput,
@@ -11,16 +12,14 @@ import type {
   FuelRecord,
 } from '../domain.js';
 import type { PostgresConnection } from '../postgres.js';
-import { adblue, cars, expenses, fuel } from '../schema.js';
+import { adblue, carNameUniqueIndex, cars, expenses, fuel } from '../schema.js';
 import type { CarDatabase } from './carDatabase.js';
 import { DuplicateCarNameError } from './errors.js';
 import { mapAdBlueRow, mapCarRow, mapExpenseRow, mapFuelRow } from './mappers.js';
 
-const UNIQUE_VIOLATION = '23505';
-
 // Folds only ASCII A-Z and compares by code point, so the order is locale-independent and the
 // frontend can reproduce it when it re-sorts after adding or renaming a Car.
-const carNameOrder = sql`translate(${cars.name}, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz') COLLATE "C"`;
+const carNameOrder = sql`lower(${cars.name} COLLATE "C")`;
 
 export class PostgresCarDatabase implements CarDatabase {
   readonly #db: PostgresConnection['db'];
@@ -41,7 +40,7 @@ export class PostgresCarDatabase implements CarDatabase {
 
   async addCar(input: CarInput): Promise<Car> {
     try {
-      const [row] = await this.#db.insert(cars).values({ name: input.name }).returning();
+      const [row] = await this.#db.insert(cars).values(input).returning();
       return mapCarRow(row!);
     } catch (error) {
       throw translateCarWriteError(error);
@@ -50,7 +49,7 @@ export class PostgresCarDatabase implements CarDatabase {
 
   async renameCar(id: number, input: CarInput): Promise<Car | undefined> {
     try {
-      const [row] = await this.#db.update(cars).set({ name: input.name }).where(eq(cars.id, id)).returning();
+      const [row] = await this.#db.update(cars).set(input).where(eq(cars.id, id)).returning();
       return row && mapCarRow(row);
     } catch (error) {
       throw translateCarWriteError(error);
@@ -60,15 +59,7 @@ export class PostgresCarDatabase implements CarDatabase {
   async addFuel(carId: number, input: FuelInput): Promise<FuelRecord> {
     const [row] = await this.#db
       .insert(fuel)
-      .values({
-        carId,
-        eventDate: input.eventDate,
-        odometerKm: input.odometerKm,
-        litersMilliliters: input.litersMilliliters,
-        priceHuf: input.priceHuf,
-        fullTank: input.fullTank,
-        remark: input.remark,
-      })
+      .values({ carId, ...input })
       .returning();
     return mapFuelRow(row!);
   }
@@ -85,14 +76,7 @@ export class PostgresCarDatabase implements CarDatabase {
   async updateFuel(carId: number, id: number, input: FuelInput): Promise<FuelRecord | undefined> {
     const [row] = await this.#db
       .update(fuel)
-      .set({
-        eventDate: input.eventDate,
-        odometerKm: input.odometerKm,
-        litersMilliliters: input.litersMilliliters,
-        priceHuf: input.priceHuf,
-        fullTank: input.fullTank,
-        remark: input.remark,
-      })
+      .set(input)
       .where(and(eq(fuel.id, id), eq(fuel.carId, carId)))
       .returning();
     return row && mapFuelRow(row);
@@ -109,13 +93,7 @@ export class PostgresCarDatabase implements CarDatabase {
   async addAdBlue(carId: number, input: AdBlueInput): Promise<AdBlueRecord> {
     const [row] = await this.#db
       .insert(adblue)
-      .values({
-        carId,
-        eventDate: input.eventDate,
-        odometerKm: input.odometerKm,
-        litersMilliliters: input.litersMilliliters,
-        priceHuf: input.priceHuf,
-      })
+      .values({ carId, ...input })
       .returning();
     return mapAdBlueRow(row!);
   }
@@ -132,12 +110,7 @@ export class PostgresCarDatabase implements CarDatabase {
   async updateAdBlue(carId: number, id: number, input: AdBlueInput): Promise<AdBlueRecord | undefined> {
     const [row] = await this.#db
       .update(adblue)
-      .set({
-        eventDate: input.eventDate,
-        odometerKm: input.odometerKm,
-        litersMilliliters: input.litersMilliliters,
-        priceHuf: input.priceHuf,
-      })
+      .set(input)
       .where(and(eq(adblue.id, id), eq(adblue.carId, carId)))
       .returning();
     return row && mapAdBlueRow(row);
@@ -154,7 +127,7 @@ export class PostgresCarDatabase implements CarDatabase {
   async addExpense(carId: number, input: ExpenseInput): Promise<ExpenseRecord> {
     const [row] = await this.#db
       .insert(expenses)
-      .values({ carId, eventDate: input.eventDate, amountHuf: input.amountHuf, notes: input.notes })
+      .values({ carId, ...input })
       .returning();
     return mapExpenseRow(row!);
   }
@@ -171,7 +144,7 @@ export class PostgresCarDatabase implements CarDatabase {
   async updateExpense(carId: number, id: number, input: ExpenseInput): Promise<ExpenseRecord | undefined> {
     const [row] = await this.#db
       .update(expenses)
-      .set({ eventDate: input.eventDate, amountHuf: input.amountHuf, notes: input.notes })
+      .set(input)
       .where(and(eq(expenses.id, id), eq(expenses.carId, carId)))
       .returning();
     return row && mapExpenseRow(row);
@@ -186,8 +159,10 @@ export class PostgresCarDatabase implements CarDatabase {
   }
 }
 
-// Drizzle wraps driver errors in DrizzleQueryError, so the Postgres error code is on `cause`.
+// Drizzle wraps driver errors in DrizzleQueryError, so the Postgres error is on `cause`.
 function translateCarWriteError(error: unknown): unknown {
-  const code = (error as { cause?: { code?: unknown } } | null)?.cause?.code;
-  return code === UNIQUE_VIOLATION ? new DuplicateCarNameError() : error;
+  const cause = (error as { cause?: unknown } | null)?.cause;
+  return cause instanceof pg.DatabaseError && cause.constraint === carNameUniqueIndex
+    ? new DuplicateCarNameError()
+    : error;
 }

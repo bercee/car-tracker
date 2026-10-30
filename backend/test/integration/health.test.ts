@@ -23,7 +23,7 @@ describe('GET /api/health against PostgreSQL', () => {
   });
 
   it('passes while the database is up and fails once it is stopped', async () => {
-    const app = createApp(new PostgresCarDatabase(connection.db), { error: () => undefined }, connection.checkHealth);
+    const app = createApp(new PostgresCarDatabase(connection.db), connection.checkHealth, { error: () => undefined });
 
     const up = await request(app).get('/api/health');
     expect(up.status).toBe(200);

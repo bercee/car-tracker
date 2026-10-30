@@ -1,15 +1,11 @@
-import path from 'node:path';
-
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { applyMigrations } from '../../src/migrations.js';
 import { createPostgresConnection } from '../../src/postgres.js';
 import type { PostgresConnection } from '../../src/postgres.js';
 import type { TestPostgres } from '../helpers/testPostgres.js';
 import { startTestPostgres } from '../helpers/testPostgres.js';
-
-const migrationsFolder = path.join(import.meta.dirname, '../../drizzle');
 
 describe('baseline migration on an empty PostgreSQL database', () => {
   let postgres: TestPostgres;
@@ -19,7 +15,7 @@ describe('baseline migration on an empty PostgreSQL database', () => {
   beforeAll(async () => {
     postgres = await startTestPostgres();
     connection = createPostgresConnection(postgres.config);
-    await migrate(connection.db, { migrationsFolder });
+    await applyMigrations(connection.db);
     client = new pg.Client({
       host: postgres.config.host,
       port: postgres.config.port,
@@ -50,9 +46,7 @@ describe('baseline migration on an empty PostgreSQL database', () => {
     return result.rows[0]!.id;
   }
 
-  it('creates the four tables and is safe to apply again', async () => {
-    await migrate(connection.db, { migrationsFolder });
-
+  it('creates the four tables', async () => {
     const tables = await client.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' ORDER BY table_name`,
@@ -112,7 +106,7 @@ describe('baseline migration on an empty PostgreSQL database', () => {
     const index = await client.query<{ indexdef: string }>(
       `SELECT indexdef FROM pg_indexes WHERE tablename = 'cars' AND indexdef ILIKE '%lower%'`,
     );
-    expect(index.rows[0]?.indexdef).toMatch(/UNIQUE INDEX .* \(lower\(name\)\)/);
+    expect(index.rows[0]?.indexdef).toMatch(/UNIQUE INDEX .* \(lower\(\(name COLLATE "C"\)\)\)/);
   });
 
   it('accepts a 60-character Car name', async () => {

@@ -1,5 +1,4 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { sql } from 'drizzle-orm';
 import pg from 'pg';
 
 import type { DatabaseConfig } from './config.js';
@@ -28,8 +27,6 @@ export function createPostgresConnection(
     database: config.name,
     user: config.user,
     password: config.password,
-    connectionTimeoutMillis: healthTimeoutMs,
-    query_timeout: healthTimeoutMs,
   });
   // An idle client dropped by a restarting server emits 'error'; unhandled, it would kill the process.
   pool.on('error', (error) => {
@@ -40,7 +37,17 @@ export function createPostgresConnection(
   return {
     db,
     async checkHealth() {
-      await db.execute(sql`SELECT 1`);
+      // Only the probe is time-limited; real queries and migrations keep the pool's defaults.
+      // The race bounds connecting and querying together, so an unreachable host cannot hang the probe.
+      let timer: NodeJS.Timeout | undefined;
+      const timeout = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('Health check timed out')), healthTimeoutMs);
+      });
+      try {
+        await Promise.race([pool.query('SELECT 1'), timeout]);
+      } finally {
+        clearTimeout(timer);
+      }
     },
     async close() {
       await pool.end();

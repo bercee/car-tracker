@@ -7,7 +7,7 @@ import { createShutdownCoordinator } from './shutdown.js';
 try {
   const config = loadConfig();
   const postgres = createPostgresConnection(config.database);
-  const app = createApp(new PostgresCarDatabase(postgres.db), console, postgres.checkHealth);
+  const app = createApp(new PostgresCarDatabase(postgres.db), postgres.checkHealth);
   const server = app.listen(config.port, config.host);
   server.once('listening', () => {
     console.log(`Car Tracker backend listening on http://${config.host}:${config.port}`);

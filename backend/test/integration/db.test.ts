@@ -231,6 +231,11 @@ describe('PostgresCarDatabase', () => {
     expect(await database.listCars()).toHaveLength(2);
   });
 
+  it('folds only ASCII case, so names differing in non-ASCII case are distinct', async () => {
+    await createCar(database, 'Ödön');
+    await expect(createCar(database, 'ödön')).resolves.toMatchObject({ name: 'ödön' });
+  });
+
   it('keeps records isolated per car and ignores a wrong car id on update and delete', async () => {
     const carA = await createCar(database, 'A');
     const carB = await createCar(database, 'B');

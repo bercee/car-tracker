@@ -11,8 +11,8 @@ import { createHealthRouter, type HealthCheck } from './routes/health.js';
 
 export function createApp(
   database: CarDatabase,
-  logger: Pick<Console, 'error'>,
   checkHealth: HealthCheck,
+  logger: Pick<Console, 'error'> = console,
 ): express.Express {
   const app = express();
   app.disable('x-powered-by');

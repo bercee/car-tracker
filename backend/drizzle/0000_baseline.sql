@@ -49,6 +49,6 @@ ALTER TABLE "adblue" ADD CONSTRAINT "adblue_car_id_cars_id_fk" FOREIGN KEY ("car
 ALTER TABLE "expenses" ADD CONSTRAINT "expenses_car_id_cars_id_fk" FOREIGN KEY ("car_id") REFERENCES "public"."cars"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fuel" ADD CONSTRAINT "fuel_car_id_cars_id_fk" FOREIGN KEY ("car_id") REFERENCES "public"."cars"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "idx_adblue_car_event_date" ON "adblue" USING btree ("car_id","event_date" DESC NULLS FIRST,"id" DESC NULLS FIRST);--> statement-breakpoint
-CREATE UNIQUE INDEX "cars_name_lower_key" ON "cars" USING btree (lower("name"));--> statement-breakpoint
+CREATE UNIQUE INDEX "cars_name_lower_key" ON "cars" USING btree (lower("name" COLLATE "C"));--> statement-breakpoint
 CREATE INDEX "idx_expenses_car_event_date" ON "expenses" USING btree ("car_id","event_date" DESC NULLS FIRST,"id" DESC NULLS FIRST);--> statement-breakpoint
 CREATE INDEX "idx_fuel_car_event_date" ON "fuel" USING btree ("car_id","event_date" DESC NULLS FIRST,"id" DESC NULLS FIRST);
