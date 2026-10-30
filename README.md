@@ -28,7 +28,14 @@ npm ci
 
 ## Development
 
-Run both development processes together:
+Development runs the backend and frontend on the host, against a PostgreSQL
+container. Start the database first (see [Development database](#development-database)):
+
+```bash
+npm run db:up
+```
+
+Then run both development processes together:
 
 ```bash
 npm run dev
@@ -67,7 +74,8 @@ The backend accepts these environment variables:
 
 ### Development database
 
-Start a PostgreSQL 17 container published on `127.0.0.1:5432` only:
+`deploy/compose.dev.yml` defines a single PostgreSQL 17 service and no
+application containers. Start it, published on `127.0.0.1:5432` only:
 
 ```bash
 npm run db:up
@@ -167,6 +175,16 @@ npm test
 npm run test:coverage
 npm run build
 ```
+
+## Compose files
+
+All live in `deploy/`:
+
+- `compose.dev.yml`: PostgreSQL only, for `npm run dev` (see above).
+- `compose.local.yml`: the whole application built from this checkout, for a
+  local production-like test (see [Local production-stack test](#local-production-stack-test)).
+- `compose.example.yml`: the home-server template (see
+  [Home-server Compose setup](#home-server-compose-setup)).
 
 ## Production containers
 
