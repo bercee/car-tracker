@@ -27,9 +27,3 @@ export interface AdBlueInput {
   litersMilliliters: number;
   priceHuf: number;
 }
-
-export interface ExpenseInput {
-  eventDate: string;
-  amountHuf: number;
-  notes: string | null;
-}

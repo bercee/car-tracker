@@ -23,9 +23,9 @@ CREATE TABLE "expenses" (
 	"car_id" integer NOT NULL,
 	"event_date" date NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"amount_huf" integer NOT NULL,
+	"price" integer NOT NULL,
 	"notes" text,
-	CONSTRAINT "expenses_amount_huf_nonnegative" CHECK ("expenses"."amount_huf" >= 0),
+	CONSTRAINT "expenses_price_nonnegative" CHECK ("expenses"."price" >= 0),
 	CONSTRAINT "expenses_notes_length" CHECK ("expenses"."notes" IS NULL OR char_length("expenses"."notes") <= 1000)
 );
 --> statement-breakpoint

@@ -44,7 +44,7 @@ export function mapExpenseRow(row: ExpenseRow): ExpenseRecord {
     id: row.id,
     eventDate: row.eventDate,
     createdAt: row.createdAt.toISOString(),
-    amount: formatHufAmount(row.amountHuf),
+    price: row.price,
     notes: row.notes,
   };
 }

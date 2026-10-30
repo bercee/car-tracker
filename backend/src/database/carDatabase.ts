@@ -3,8 +3,8 @@ import type {
   AdBlueRecord,
   Car,
   CarInput,
-  ExpenseInput,
   ExpenseRecord,
+  ExpenseRequest,
   FuelInput,
   FuelRecord,
 } from '../domain.js';
@@ -22,8 +22,8 @@ export interface CarDatabase {
   updateAdBlue(carId: number, id: number, input: AdBlueInput): Promise<AdBlueRecord | undefined>;
   deleteAdBlue(carId: number, id: number): Promise<boolean>;
   listAdBlue(carId: number): Promise<AdBlueRecord[]>;
-  addExpense(carId: number, input: ExpenseInput): Promise<ExpenseRecord>;
-  updateExpense(carId: number, id: number, input: ExpenseInput): Promise<ExpenseRecord | undefined>;
+  addExpense(carId: number, input: ExpenseRequest): Promise<ExpenseRecord>;
+  updateExpense(carId: number, id: number, input: ExpenseRequest): Promise<ExpenseRecord | undefined>;
   deleteExpense(carId: number, id: number): Promise<boolean>;
   listExpenses(carId: number): Promise<ExpenseRecord[]>;
 }

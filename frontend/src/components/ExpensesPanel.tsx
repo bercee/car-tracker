@@ -1,15 +1,22 @@
 import { useCallback } from 'react';
+import { expenseRequestSchema, type ExpenseRecord, type ExpenseRequest } from '@car-tracker/contracts';
 import { addExpense, deleteExpense, getExpenses, updateExpense } from '../api';
+import { numberOf, parseRequest } from '../form';
 import { formatDate, formatMoney, today } from '../format';
-import { isHuf } from '../validation';
-import type { ExpenseRecord, ExpenseRequest } from '@car-tracker/contracts';
 import { Panel } from './Panel';
 import { RecordTable, type RecordTableColumn } from './RecordTable';
 
-const initial = (): ExpenseRequest => ({ eventDate: today(), amount: '', notes: '' });
+interface ExpenseForm {
+  eventDate: string;
+  price: string;
+  notes: string;
+}
+
+const initial = (): ExpenseForm => ({ eventDate: today(), price: '', notes: '' });
+const parse = (form: ExpenseForm) => parseRequest(expenseRequestSchema, { ...form, price: numberOf(form.price) });
 const columns: RecordTableColumn<ExpenseRecord>[] = [
   { header: 'Date', render: (record) => formatDate(record.eventDate) },
-  { header: 'Amount', render: (record) => formatMoney(record.amount) },
+  { header: 'Price', render: (record) => formatMoney(record.price) },
   { header: 'Notes', render: (record) => record.notes ?? '—' },
 ];
 
@@ -25,15 +32,9 @@ export function ExpensesPanel({ carId }: { carId: number }) {
       submit={submit}
       update={update}
       remove={remove}
-      toFormValue={(r) => ({ eventDate: r.eventDate, amount: r.amount, notes: r.notes ?? '' })}
+      toFormValue={(r) => ({ eventDate: r.eventDate, price: String(r.price), notes: r.notes ?? '' })}
       initial={initial}
-      validate={(v) =>
-        !/^\d{4}-\d{2}-\d{2}$/.test(v.eventDate)
-          ? 'Enter a valid date.'
-          : !isHuf(v.amount)
-            ? 'Enter a whole HUF amount.'
-            : undefined
-      }
+      parse={parse}
       table={(records, actions) => (
         <RecordTable records={records} columns={columns} actions={{ ...actions, label: 'Expenses' }} />
       )}
@@ -50,18 +51,18 @@ export function ExpensesPanel({ carId }: { carId: number }) {
             />
           </label>
           <label>
-            Amount (HUF)
+            Price (HUF)
             <input
               type="text"
               inputMode="numeric"
-              value={v.amount}
-              onChange={(e) => set({ ...v, amount: e.target.value })}
+              value={v.price}
+              onChange={(e) => set({ ...v, price: e.target.value })}
               required
             />
           </label>
           <label>
             Notes
-            <textarea maxLength={1000} value={v.notes ?? ''} onChange={(e) => set({ ...v, notes: e.target.value })} />
+            <textarea maxLength={1000} value={v.notes} onChange={(e) => set({ ...v, notes: e.target.value })} />
           </label>
         </>
       )}

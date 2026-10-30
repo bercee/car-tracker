@@ -82,13 +82,13 @@ describe('Express API', () => {
     expect((await request(app).get(`/api/cars/${carId}/adblue`)).body).toEqual([created.body]);
   });
 
-  it('creates, canonicalizes, and lists an expense record', async () => {
+  it('creates and lists an expense record with a numeric price', async () => {
     const app = createApp(testDatabase.database, healthy, logger);
     expect((await request(app).get(`/api/cars/${carId}/expenses`)).body).toEqual([]);
 
     const created = await request(app).post(`/api/cars/${carId}/expenses`).send({
       eventDate: '2026-09-17',
-      amount: '32000',
+      price: 32000,
       notes: ' Annual inspection ',
     });
 
@@ -97,7 +97,7 @@ describe('Express API', () => {
     expect(created.body).toMatchObject({
       id: 1,
       eventDate: '2026-09-17',
-      amount: '32000',
+      price: 32000,
       notes: 'Annual inspection',
     });
     expect((await request(app).get(`/api/cars/${carId}/expenses`)).body).toEqual([created.body]);
@@ -122,7 +122,7 @@ describe('Express API', () => {
         .post(`/api/cars/${carId}/adblue`)
         .send({ eventDate, odometerKm: index, liters: '1', price: '1000' })
         .expect(201);
-      await request(app).post(`/api/cars/${carId}/expenses`).send({ eventDate, amount: '1000' }).expect(201);
+      await request(app).post(`/api/cars/${carId}/expenses`).send({ eventDate, price: 1000 }).expect(201);
     }
 
     expect((await request(app).get(`/api/cars/${carId}/fuel`)).body.map((record: { id: number }) => record.id)).toEqual(
@@ -151,8 +151,8 @@ describe('Express API', () => {
       ],
       [
         `/api/cars/${carId}/expenses`,
-        { eventDate: '2026-09-15', amount: '100', notes: 'old' },
-        { eventDate: '2026-09-16', amount: '200', notes: ' new ' },
+        { eventDate: '2026-09-15', price: 100, notes: 'old' },
+        { eventDate: '2026-09-16', price: 200, notes: ' new ' },
       ],
     ] as const;
     for (const [path, original, changed] of specs) {
@@ -183,7 +183,7 @@ describe('Express API', () => {
       { eventDate: '2026-09-15', odometerKm: 1, liters: '1', price: '1', fullTank: false },
     ],
     ['adblue', [], { eventDate: '2026-09-15', odometerKm: 1, liters: '1', price: '1' }],
-    ['expenses', { eventDate: '2026-09-15', amount: '1.5' }, { eventDate: '2026-09-15', amount: '1' }],
+    ['expenses', { eventDate: '2026-09-15', price: 1.5 }, { eventDate: '2026-09-15', price: 1 }],
   ])('rejects invalid PUT bodies without changing %s', async (resource, invalid, valid) => {
     const path = `/api/cars/${carId}/${resource}`;
     const app = createApp(testDatabase.database, healthy, logger);
@@ -196,7 +196,7 @@ describe('Express API', () => {
   it.each([
     ['fuel', { eventDate: 'bad' }],
     ['adblue', []],
-    ['expenses', { eventDate: '2026-09-17', amount: '1.5' }],
+    ['expenses', { eventDate: '2026-09-17', price: 1.5 }],
   ])('rejects invalid input without writing a row for %s', async (resource, body) => {
     const path = `/api/cars/${carId}/${resource}`;
     const app = createApp(testDatabase.database, healthy, logger);
@@ -224,7 +224,7 @@ describe('Express API', () => {
     const app = createApp(testDatabase.database, healthy, logger);
     const created = await request(app)
       .post(`/api/cars/${carId}/expenses`)
-      .send({ eventDate: '2026-09-17', amount: '10' })
+      .send({ eventDate: '2026-09-17', price: 10 })
       .expect(201);
     await request(app).put(`/api/cars/${carId}/expenses/${created.body.id}`).expect(415);
     const updated = await request(app)
@@ -242,7 +242,7 @@ describe('Express API', () => {
     const bodies = {
       fuel: { eventDate: '2026-09-15', odometerKm: 10, liters: '1', price: '100', fullTank: true },
       adblue: { eventDate: '2026-09-15', odometerKm: 10, liters: '1', price: '100' },
-      expenses: { eventDate: '2026-09-15', amount: '100' },
+      expenses: { eventDate: '2026-09-15', price: 100 },
     };
 
     for (const [resource, body] of Object.entries(bodies)) {
@@ -298,7 +298,7 @@ describe('Express API', () => {
     const response = await request(app)
       .post(`/api/cars/${carId}/expenses`)
       .set('Content-Type', 'application/json')
-      .send(JSON.stringify({ eventDate: '2026-09-17', amount: '1', notes: 'x'.repeat(17 * 1024) }));
+      .send(JSON.stringify({ eventDate: '2026-09-17', price: 1, notes: 'x'.repeat(17 * 1024) }));
 
     expect(response.status).toBe(413);
     expect(response.body).toEqual({
@@ -310,12 +310,12 @@ describe('Express API', () => {
     });
     const created = await request(app)
       .post(`/api/cars/${carId}/expenses`)
-      .send({ eventDate: '2026-09-17', amount: '1' })
+      .send({ eventDate: '2026-09-17', price: 1 })
       .expect(201);
     await request(app)
       .put(`/api/cars/${carId}/expenses/${created.body.id}`)
       .set('Content-Type', 'application/json')
-      .send(JSON.stringify({ eventDate: '2026-09-17', amount: '1', notes: 'x'.repeat(17 * 1024) }))
+      .send(JSON.stringify({ eventDate: '2026-09-17', price: 1, notes: 'x'.repeat(17 * 1024) }))
       .expect(413);
   });
 
@@ -355,6 +355,74 @@ describe('Express API', () => {
     expect(response.text).not.toContain('SQL statement');
     expect(response.text).not.toContain('stack');
     expect(logger.error).toHaveBeenCalledOnce();
+  });
+
+  describe('expense validation', () => {
+    const valid = { eventDate: '2026-09-17', price: 32_000, notes: 'Annual inspection' };
+    const path = () => `/api/cars/${carId}/expenses`;
+
+    it('round-trips the Price boundaries as numbers and stores blank notes as null', async () => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      for (const price of [0, 9_999_999]) {
+        const created = await request(app).post(path()).send({ eventDate: '2026-02-28', price }).expect(201);
+        expect(created.body).toMatchObject({ price, notes: null });
+      }
+      for (const notes of [null, '', '   ']) {
+        const created = await request(app)
+          .post(path())
+          .send({ ...valid, notes })
+          .expect(201);
+        expect(created.body.notes).toBeNull();
+      }
+      const maxNotes = await request(app)
+        .post(path())
+        .send({ ...valid, notes: 'x'.repeat(1000) })
+        .expect(201);
+      expect(maxNotes.body.notes).toHaveLength(1000);
+      expect((await request(app).get(path())).body.map((record: { price: number }) => record.price)).toContain(
+        9_999_999,
+      );
+    });
+
+    it('updates the Price of an expense', async () => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const created = await request(app).post(path()).send(valid).expect(201);
+      const updated = await request(app)
+        .put(`${path()}/${created.body.id}`)
+        .send({ eventDate: '2026-09-18', price: 1, notes: ' ' })
+        .expect(200);
+      expect(updated.body).toMatchObject({ id: created.body.id, price: 1, notes: null, eventDate: '2026-09-18' });
+    });
+
+    it.each([
+      ['legacy amount instead of price', { eventDate: valid.eventDate, amount: 5 }, 'price'],
+      ['missing price', { eventDate: valid.eventDate }, 'price'],
+      ['missing eventDate', { price: 5 }, 'eventDate'],
+      ['unknown key', { ...valid, extra: 1 }, 'body'],
+      ['string price', { ...valid, price: '100' }, 'price'],
+      ['null price', { ...valid, price: null }, 'price'],
+      ['fractional price', { ...valid, price: 1.5 }, 'price'],
+      ['negative price', { ...valid, price: -1 }, 'price'],
+      ['too-large price', { ...valid, price: 10_000_000 }, 'price'],
+      ['impossible date', { ...valid, eventDate: '2026-02-30' }, 'eventDate'],
+      ['malformed date', { ...valid, eventDate: '2026-2-3' }, 'eventDate'],
+      ['non-string date', { ...valid, eventDate: 20260917 }, 'eventDate'],
+      ['too-long notes', { ...valid, notes: 'x'.repeat(1001) }, 'notes'],
+      ['non-string notes', { ...valid, notes: 5 }, 'notes'],
+      ['array body', [], 'body'],
+      ['null body', null, 'body'],
+    ])('rejects %s', async (_name, body, field) => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const created = await request(app).post(path()).send(valid).expect(201);
+
+      const json = JSON.stringify(body);
+      const send = (r: request.Test) => r.set('Content-Type', 'application/json').send(json);
+      const rejected = await send(request(app).post(path())).expect(400);
+      expect(rejected.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field });
+      expect(rejected.body.error.message).toEqual(expect.any(String));
+      await send(request(app).put(`${path()}/${created.body.id}`)).expect(400);
+      expect((await request(app).get(path())).body).toEqual([created.body]);
+    });
   });
 
   describe('cars', () => {
@@ -398,7 +466,7 @@ describe('Express API', () => {
       const app = createApp(testDatabase.database, healthy, logger);
       await request(app)
         .post(`/api/cars/${carId}/expenses`)
-        .send({ eventDate: '2026-09-17', amount: '15000' })
+        .send({ eventDate: '2026-09-17', price: 15000 })
         .expect(201);
       const before = await request(app).get(`/api/cars/${carId}/expenses`);
       expect(before.body).toHaveLength(1);

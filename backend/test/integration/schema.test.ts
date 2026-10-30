@@ -76,7 +76,7 @@ describe('baseline migration on an empty PostgreSQL database', () => {
       expect(typeOf(table, 'price_huf')).toBe('integer');
     }
     expect(typeOf('fuel', 'full_tank')).toBe('boolean');
-    expect(typeOf('expenses', 'amount_huf')).toBe('integer');
+    expect(typeOf('expenses', 'price')).toBe('integer');
 
     const identity = await client.query<{ table_name: string; is_identity: string }>(
       `SELECT table_name, is_identity FROM information_schema.columns
@@ -148,7 +148,7 @@ describe('baseline migration on an empty PostgreSQL database', () => {
 
   it('enforces the expense CHECKs', async () => {
     const carId = await insertCar('Expense checks');
-    const insertExpense = 'INSERT INTO expenses (car_id, event_date, amount_huf, notes) VALUES ($1, $2, $3, $4)';
+    const insertExpense = 'INSERT INTO expenses (car_id, event_date, price, notes) VALUES ($1, $2, $3, $4)';
     const ok = [carId, '2026-09-17', 100, null];
     const withValue = (index: number, value: unknown) => ok.map((entry, i) => (i === index ? value : entry));
 
@@ -163,12 +163,12 @@ describe('baseline migration on an empty PostgreSQL database', () => {
     const carId = await insertCar('Restricted');
 
     await expectViolation(
-      'INSERT INTO expenses (car_id, event_date, amount_huf) VALUES ($1, $2, $3)',
+      'INSERT INTO expenses (car_id, event_date, price) VALUES ($1, $2, $3)',
       [999_999, '2026-09-17', 100],
       '23503',
     );
     await expectViolation(
-      'INSERT INTO expenses (car_id, event_date, amount_huf) VALUES ($1, $2, $3)',
+      'INSERT INTO expenses (car_id, event_date, price) VALUES ($1, $2, $3)',
       [null, '2026-09-17', 100],
       '23502',
     );
@@ -181,10 +181,7 @@ describe('baseline migration on an empty PostgreSQL database', () => {
       'INSERT INTO adblue (car_id, event_date, odometer_km, liters_milliliters, price_huf) VALUES ($1, $2, 1, 1000, 1)',
       [carId, '2026-09-17'],
     );
-    await client.query('INSERT INTO expenses (car_id, event_date, amount_huf) VALUES ($1, $2, 1)', [
-      carId,
-      '2026-09-17',
-    ]);
+    await client.query('INSERT INTO expenses (car_id, event_date, price) VALUES ($1, $2, 1)', [carId, '2026-09-17']);
 
     await expectViolation('DELETE FROM cars WHERE id = $1', [carId], '23503');
     for (const table of ['fuel', 'adblue', 'expenses']) {

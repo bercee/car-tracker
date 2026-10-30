@@ -22,11 +22,30 @@ export interface AdBlueRequest {
   price: string;
 }
 
-export interface ExpenseRequest {
-  eventDate: string;
-  amount: string;
-  notes?: string | null;
-}
+export const dateSchema = z.iso.date({ error: 'Enter a valid date.' });
+
+const PRICE_MESSAGE = 'Enter a whole HUF price from 0 to 9,999,999.';
+export const priceSchema = z
+  .number({ error: PRICE_MESSAGE })
+  .int({ error: PRICE_MESSAGE })
+  .min(0, { error: PRICE_MESSAGE })
+  .max(9_999_999, { error: PRICE_MESSAGE });
+
+// Trimmed text where blank (or absent) is stored as null.
+export const optionalText = (maxLength: number, label: string) =>
+  z
+    .string({ error: `${label} must be text.` })
+    .trim()
+    .max(maxLength, { error: `${label} must be at most ${maxLength} characters.` })
+    .nullish()
+    .transform((value) => value || null);
+
+export const expenseRequestSchema = z.strictObject({
+  eventDate: dateSchema,
+  price: priceSchema,
+  notes: optionalText(1000, 'Notes'),
+});
+export type ExpenseRequest = z.infer<typeof expenseRequestSchema>;
 
 export interface CarRequest {
   name: string;
@@ -51,7 +70,6 @@ export interface AdBlueRecord extends AdBlueRequest {
 export interface ExpenseRecord extends ExpenseRequest {
   id: number;
   createdAt: string;
-  notes: string | null;
 }
 
 export type ErrorCode = 'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFLICT' | 'UNSUPPORTED_MEDIA_TYPE' | 'INTERNAL_ERROR';

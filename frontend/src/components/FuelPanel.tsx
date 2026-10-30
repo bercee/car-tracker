@@ -44,10 +44,12 @@ export function FuelPanel({ carId }: { carId: number }) {
         remark: r.remark ?? '',
       })}
       initial={initial}
-      validate={(v) =>
-        validateCommon(v.eventDate, String(v.odometerKm), v.liters) ??
-        (!isHuf(v.price) ? 'Enter a whole HUF amount.' : undefined)
-      }
+      parse={(v) => {
+        const error =
+          validateCommon(v.eventDate, String(v.odometerKm), v.liters) ??
+          (!isHuf(v.price) ? 'Enter a whole HUF amount.' : undefined);
+        return error === undefined ? { data: v } : { error };
+      }}
       table={(records, actions) => (
         <RecordTable records={records} columns={columns} actions={{ ...actions, label: 'Fuel' }} />
       )}

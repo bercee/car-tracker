@@ -1,5 +1,5 @@
 {
-  "id": "e60e0219-a36f-4d93-86eb-b20fb791f2d5",
+  "id": "fae95377-f75d-4ba1-8476-8fb6dbf32443",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -230,8 +230,8 @@
           "notNull": true,
           "default": "now()"
         },
-        "amount_huf": {
-          "name": "amount_huf",
+        "price": {
+          "name": "price",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -291,9 +291,9 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "expenses_amount_huf_nonnegative": {
-          "name": "expenses_amount_huf_nonnegative",
-          "value": "\"expenses\".\"amount_huf\" >= 0"
+        "expenses_price_nonnegative": {
+          "name": "expenses_price_nonnegative",
+          "value": "\"expenses\".\"price\" >= 0"
         },
         "expenses_notes_length": {
           "name": "expenses_notes_length",

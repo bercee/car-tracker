@@ -41,7 +41,7 @@ describe('PostgresCarDatabase', () => {
     });
     const expense = await database.addExpense(car.id, {
       eventDate: '2026-09-17',
-      amountHuf: 32_000,
+      price: 32_000,
       notes: 'Annual inspection',
     });
 
@@ -55,7 +55,7 @@ describe('PostgresCarDatabase', () => {
       remark: 'Shell',
     });
     expect(adBlue).toMatchObject({ id: 1, liters: '10.000', price: '7490' });
-    expect(expense).toMatchObject({ id: 1, amount: '32000', notes: 'Annual inspection' });
+    expect(expense).toMatchObject({ id: 1, price: 32_000, notes: 'Annual inspection' });
     expect(fuel.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     expect(adBlue.createdAt).toMatch(/^\d{4}-/);
     expect(expense.createdAt).toMatch(/^\d{4}-/);
@@ -111,9 +111,9 @@ describe('PostgresCarDatabase', () => {
       priceHuf: 3000,
     });
 
-    await database.addExpense(car.id, { eventDate: '2026-01-01', amountHuf: 1000, notes: null });
-    await database.addExpense(car.id, { eventDate: '2026-02-01', amountHuf: 2000, notes: null });
-    await database.addExpense(car.id, { eventDate: '2026-02-01', amountHuf: 3000, notes: null });
+    await database.addExpense(car.id, { eventDate: '2026-01-01', price: 1000, notes: null });
+    await database.addExpense(car.id, { eventDate: '2026-02-01', price: 2000, notes: null });
+    await database.addExpense(car.id, { eventDate: '2026-02-01', price: 3000, notes: null });
 
     expect((await database.listFuel(car.id)).map(({ id }) => id)).toEqual([3, 2, 1]);
     expect((await database.listAdBlue(car.id)).map(({ id }) => id)).toEqual([3, 2, 1]);
@@ -144,7 +144,7 @@ describe('PostgresCarDatabase', () => {
       litersMilliliters: 1000,
       priceHuf: 100,
     });
-    const expense = await database.addExpense(car.id, { eventDate: '2026-01-01', amountHuf: 100, notes: null });
+    const expense = await database.addExpense(car.id, { eventDate: '2026-01-01', price: 100, notes: null });
     const changedFuel = await database.updateFuel(car.id, fuel.id, {
       eventDate: '2026-03-01',
       odometerKm: 22,
@@ -161,7 +161,7 @@ describe('PostgresCarDatabase', () => {
     });
     const changedExpense = await database.updateExpense(car.id, expense.id, {
       eventDate: '2026-03-03',
-      amountHuf: 300,
+      price: 300,
       notes: 'updated',
     });
     expect(changedFuel).toMatchObject({
@@ -181,7 +181,7 @@ describe('PostgresCarDatabase', () => {
       id: expense.id,
       createdAt: expense.createdAt,
       eventDate: '2026-03-03',
-      amount: '300',
+      price: 300,
       notes: 'updated',
     });
     expect((await database.listFuel(car.id)).map((row) => row.id)).toEqual([fuel.id, otherFuel.id]);
@@ -248,7 +248,7 @@ describe('PostgresCarDatabase', () => {
       remark: null,
     };
     const blue = { eventDate: '2026-01-01', odometerKm: 1, litersMilliliters: 1000, priceHuf: 100 };
-    const expense = { eventDate: '2026-01-01', amountHuf: 100, notes: null };
+    const expense = { eventDate: '2026-01-01', price: 100, notes: null };
     const fuelA = await database.addFuel(carA.id, fuel);
     const blueA = await database.addAdBlue(carA.id, blue);
     const expenseA = await database.addExpense(carA.id, expense);
@@ -268,9 +268,9 @@ describe('PostgresCarDatabase', () => {
   });
 
   it('rejects records for an unknown car through the foreign key', async () => {
-    await expect(
-      database.addExpense(999, { eventDate: '2026-01-01', amountHuf: 100, notes: null }),
-    ).rejects.toMatchObject({ cause: { code: '23503' } });
+    await expect(database.addExpense(999, { eventDate: '2026-01-01', price: 100, notes: null })).rejects.toMatchObject({
+      cause: { code: '23503' },
+    });
   });
 
   it('lists cars by ASCII-folded code-point order, matching the frontend', async () => {

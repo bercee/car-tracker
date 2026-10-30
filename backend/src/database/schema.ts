@@ -79,7 +79,7 @@ export const expenses = pgTable(
       .references(() => cars.id, { onDelete: 'restrict' }),
     eventDate: eventDate(),
     createdAt: createdAt(),
-    amountHuf: integer('amount_huf').notNull(),
+    price: integer().notNull(),
     notes: text(),
   },
   (table) => [
@@ -88,7 +88,7 @@ export const expenses = pgTable(
       table.eventDate.desc().nullsFirst(),
       table.id.desc().nullsFirst(),
     ),
-    check('expenses_amount_huf_nonnegative', sql`${table.amountHuf} >= 0`),
+    check('expenses_price_nonnegative', sql`${table.price} >= 0`),
     check('expenses_notes_length', sql`${table.notes} IS NULL OR char_length(${table.notes}) <= 1000`),
   ],
 );

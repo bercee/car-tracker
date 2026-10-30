@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapAdBlueRow, mapCarRow, mapExpenseRow, mapFuelRow } from '../../src/database/mappers.js';
+import { mapAdBlueRow, mapCarRow, mapFuelRow } from '../../src/database/mappers.js';
 
 const createdAt = new Date('2026-09-16T12:34:56.789Z');
 
@@ -50,11 +50,5 @@ describe('database row mappers', () => {
         priceHuf: 7490,
       }),
     ).toMatchObject({ id: 2, liters: '10.000', price: '7490' });
-  });
-
-  it('maps an expense row with a whole-HUF amount', () => {
-    expect(
-      mapExpenseRow({ id: 3, carId: 1, eventDate: '2026-09-15', createdAt, amountHuf: 32_000, notes: null }),
-    ).toMatchObject({ id: 3, amount: '32000', notes: null });
   });
 });

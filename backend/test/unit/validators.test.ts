@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { validateAdBlueRequest } from '../../src/validation/adblue.js';
 import { validateCarRequest } from '../../src/validation/car.js';
-import { validateExpenseRequest } from '../../src/validation/expense.js';
 import { validateFuelRequest } from '../../src/validation/fuel.js';
 
 const validFuel = {
@@ -92,42 +91,6 @@ describe('AdBlue validation', () => {
     [{ ...valid, extra: null }, 'extra is not allowed'],
   ])('rejects invalid input', (input, message) => {
     expect(() => validateAdBlueRequest(input)).toThrow(message);
-  });
-});
-
-describe('expense validation', () => {
-  const valid = { eventDate: '2026-09-15', amount: '32000', notes: ' Annual inspection ' };
-
-  it('validates and converts a request', () => {
-    expect(validateExpenseRequest(valid)).toEqual({
-      eventDate: '2026-09-15',
-      amountHuf: 32_000,
-      notes: 'Annual inspection',
-    });
-  });
-
-  it('accepts zero HUF and null notes', () => {
-    expect(validateExpenseRequest({ ...valid, amount: '0', notes: null })).toMatchObject({
-      amountHuf: 0,
-      notes: null,
-    });
-  });
-
-  it('accepts the maximum HUF value and maximum-length notes', () => {
-    expect(validateExpenseRequest({ ...valid, amount: '9999999', notes: 'x'.repeat(1000) })).toMatchObject({
-      amountHuf: 9_999_999,
-      notes: 'x'.repeat(1000),
-    });
-  });
-
-  it.each([
-    [{ ...valid, amount: '-1' }, 'amount must be a canonical whole-number HUF amount'],
-    [{ ...valid, amount: '32000.5' }, 'amount must be a canonical whole-number HUF amount'],
-    [{ ...valid, notes: 'x'.repeat(1001) }, 'notes must be at most 1000 characters'],
-    [{ ...valid, notes: false }, 'notes must be a string or null'],
-    [{ eventDate: valid.eventDate, notes: valid.notes }, 'amount is required'],
-  ])('rejects invalid input', (input, message) => {
-    expect(() => validateExpenseRequest(input)).toThrow(message);
   });
 });
 
