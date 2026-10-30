@@ -684,7 +684,7 @@ describe('App', () => {
       );
     });
 
-    it('keeps the history across car and section switches', async () => {
+    it('keeps the Undo history across car and section switches', async () => {
       defaults();
       api.getFuel.mockResolvedValue([fuelRow(8, 'Original')]);
       const user = userEvent.setup();
@@ -709,7 +709,7 @@ describe('App', () => {
       );
     });
 
-    it('keeps a separate history per panel', async () => {
+    it('keeps a separate Undo history per panel', async () => {
       defaults();
       api.getFuel.mockResolvedValue([fuelRow(8, 'Original')]);
       const user = userEvent.setup();
@@ -841,7 +841,7 @@ describe('App', () => {
       expect(screen.getByLabelText('Liters')).toHaveValue('7');
     });
 
-    it('shows the error and keeps the entry when an undo fails', async () => {
+    it('shows the error and keeps the Record action when an undo fails', async () => {
       defaults();
       api.getFuel.mockResolvedValue([fuelRow(8, 'Original')]);
       const user = userEvent.setup();
@@ -996,7 +996,7 @@ describe('App', () => {
       await editRemark(user, 'Second');
     };
 
-    it('keeps the entry after a network failure and applies it on retry', async () => {
+    it('keeps the Record action after a network failure and applies it on retry', async () => {
       defaults();
       const user = userEvent.setup();
       await twoEdits(user);
@@ -1015,7 +1015,7 @@ describe('App', () => {
     it.each([
       ['not found', 'not-found'],
       ['rejected', 'rejected'],
-    ] as const)('drops the entry after an undo fails as %s', async (_label, kind) => {
+    ] as const)('drops the Record action after an undo fails as %s', async (_label, kind) => {
       defaults();
       const user = userEvent.setup();
       await twoEdits(user);
@@ -1033,7 +1033,7 @@ describe('App', () => {
       expect(panel('Fuel').getByRole('button', { name: 'Undo' })).toBeDisabled();
     });
 
-    it('disables Undo after dropping the only entry', async () => {
+    it('disables Undo after dropping the only Record action', async () => {
       defaults();
       api.getFuel.mockResolvedValue([fuelRow(8, 'Original')]);
       const user = userEvent.setup();
@@ -1065,7 +1065,7 @@ describe('App', () => {
     it.each([
       ['not found', 'not-found'],
       ['rejected', 'rejected'],
-    ] as const)('drops the entry after a redo fails as %s', async (_label, kind) => {
+    ] as const)('drops the Record action after a redo fails as %s', async (_label, kind) => {
       defaults();
       api.getFuel.mockResolvedValue([fuelRow(8, 'Original')]);
       const user = userEvent.setup();

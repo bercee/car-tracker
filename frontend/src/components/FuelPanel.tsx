@@ -3,8 +3,7 @@ import { addFuel, deleteFuel, getFuel, updateFuel } from '../api';
 import { formatDate, formatLiters, formatMoney, today } from '../format';
 import { isHuf, validateCommon } from '../validation';
 import type { FuelRecord, FuelRequest } from '@car-tracker/contracts';
-import type { UndoHistory } from '../undoHistory';
-import { Panel } from './Panel';
+import { Panel, type RecordPanelProps } from './Panel';
 import { RecordTable, type RecordTableColumn } from './RecordTable';
 
 const initial = (): FuelRequest => ({
@@ -24,7 +23,7 @@ const columns: RecordTableColumn<FuelRecord>[] = [
   { header: 'Remark', render: (record) => record.remark ?? '—' },
 ];
 
-export function FuelPanel({ carId, history, visible }: { carId: number; history: UndoHistory; visible: boolean }) {
+export function FuelPanel({ carId, undoHistory, visible }: RecordPanelProps) {
   const load = useCallback(() => getFuel(carId), [carId]);
   const submit = useCallback((value: FuelRequest) => addFuel(carId, value), [carId]);
   const update = useCallback((id: number, value: FuelRequest) => updateFuel(carId, id, value), [carId]);
@@ -32,7 +31,7 @@ export function FuelPanel({ carId, history, visible }: { carId: number; history:
   return (
     <Panel
       title="Fuel"
-      history={history}
+      undoHistory={undoHistory}
       visible={visible}
       load={load}
       submit={submit}

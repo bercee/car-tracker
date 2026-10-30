@@ -1,45 +1,46 @@
 import { describe, expect, it, vi } from 'vitest';
-import { UndoHistory, type UndoEntry } from '../../src/undoHistory';
+import { UndoHistory, type RecordAction } from '../../src/undoHistory';
 
-const entry = (recordId: number, description: string, log: string[] = []): UndoEntry => ({
+const action = (recordId: number, label: string, log: string[] = []): RecordAction => ({
   recordId,
-  description,
+  label,
+  eventDate: '2026-10-12',
   reverse: () => {
-    log.push(`reverse ${description}`);
+    log.push(`reverse ${label}`);
     return Promise.resolve();
   },
   reapply: () => {
-    log.push(`reapply ${description}`);
+    log.push(`reapply ${label}`);
     return Promise.resolve();
   },
 });
 
-describe('undo history', () => {
+describe('Undo history', () => {
   it('has nothing to undo or redo when empty', async () => {
-    const history = new UndoHistory();
-    expect(history.undoDescription()).toBeUndefined();
-    expect(history.redoDescription()).toBeUndefined();
-    expect(await history.undo()).toBeUndefined();
-    expect(await history.redo()).toBeUndefined();
+    const undoHistory = new UndoHistory();
+    expect(undoHistory.nextUndo()).toBeUndefined();
+    expect(undoHistory.nextRedo()).toBeUndefined();
+    expect(await undoHistory.undo()).toBeUndefined();
+    expect(await undoHistory.redo()).toBeUndefined();
   });
 
-  it('undoes and redoes entries in order, newest first', async () => {
+  it('undoes and redoes Record actions in order, newest first', async () => {
     const log: string[] = [];
-    const history = new UndoHistory();
-    history.record(entry(1, 'first', log));
-    history.record(entry(2, 'second', log));
-    history.record(entry(3, 'third', log));
+    const undoHistory = new UndoHistory();
+    undoHistory.record(action(1, 'first', log));
+    undoHistory.record(action(2, 'second', log));
+    undoHistory.record(action(3, 'third', log));
 
-    expect((await history.undo())?.recordId).toBe(3);
-    expect((await history.undo())?.recordId).toBe(2);
-    expect((await history.redo())?.recordId).toBe(2);
-    expect((await history.undo())?.recordId).toBe(2);
-    expect((await history.undo())?.recordId).toBe(1);
-    expect(await history.undo()).toBeUndefined();
-    expect((await history.redo())?.recordId).toBe(1);
-    expect((await history.redo())?.recordId).toBe(2);
-    expect((await history.redo())?.recordId).toBe(3);
-    expect(await history.redo()).toBeUndefined();
+    expect((await undoHistory.undo())?.recordId).toBe(3);
+    expect((await undoHistory.undo())?.recordId).toBe(2);
+    expect((await undoHistory.redo())?.recordId).toBe(2);
+    expect((await undoHistory.undo())?.recordId).toBe(2);
+    expect((await undoHistory.undo())?.recordId).toBe(1);
+    expect(await undoHistory.undo()).toBeUndefined();
+    expect((await undoHistory.redo())?.recordId).toBe(1);
+    expect((await undoHistory.redo())?.recordId).toBe(2);
+    expect((await undoHistory.redo())?.recordId).toBe(3);
+    expect(await undoHistory.redo()).toBeUndefined();
     expect(log).toEqual([
       'reverse third',
       'reverse second',
@@ -52,74 +53,74 @@ describe('undo history', () => {
     ]);
   });
 
-  it('reports the description of the next undo and the next redo', async () => {
-    const history = new UndoHistory();
-    history.record(entry(1, 'first'));
-    history.record(entry(2, 'second'));
-    expect(history.undoDescription()).toBe('second');
-    expect(history.redoDescription()).toBeUndefined();
+  it('reports the next Record action to undo and to redo', async () => {
+    const undoHistory = new UndoHistory();
+    undoHistory.record(action(1, 'first'));
+    undoHistory.record(action(2, 'second'));
+    expect(undoHistory.nextUndo()?.label).toBe('second');
+    expect(undoHistory.nextRedo()?.label).toBeUndefined();
 
-    await history.undo();
-    expect(history.undoDescription()).toBe('first');
-    expect(history.redoDescription()).toBe('second');
+    await undoHistory.undo();
+    expect(undoHistory.nextUndo()?.label).toBe('first');
+    expect(undoHistory.nextRedo()?.label).toBe('second');
 
-    await history.undo();
-    expect(history.undoDescription()).toBeUndefined();
-    expect(history.redoDescription()).toBe('first');
+    await undoHistory.undo();
+    expect(undoHistory.nextUndo()?.label).toBeUndefined();
+    expect(undoHistory.nextRedo()?.label).toBe('first');
   });
 
-  it('clears redo when a new entry is recorded', async () => {
-    const history = new UndoHistory();
-    history.record(entry(1, 'first'));
-    history.record(entry(2, 'second'));
-    await history.undo();
-    expect(history.redoDescription()).toBe('second');
+  it('clears redo when a new Record action is recorded', async () => {
+    const undoHistory = new UndoHistory();
+    undoHistory.record(action(1, 'first'));
+    undoHistory.record(action(2, 'second'));
+    await undoHistory.undo();
+    expect(undoHistory.nextRedo()?.label).toBe('second');
 
-    history.record(entry(3, 'third'));
-    expect(history.redoDescription()).toBeUndefined();
-    expect(await history.redo()).toBeUndefined();
-    expect(history.undoDescription()).toBe('third');
+    undoHistory.record(action(3, 'third'));
+    expect(undoHistory.nextRedo()?.label).toBeUndefined();
+    expect(await undoHistory.redo()).toBeUndefined();
+    expect(undoHistory.nextUndo()?.label).toBe('third');
   });
 
   it('is pending while an undo runs, ignores a second one meanwhile and tells subscribers', async () => {
-    const history = new UndoHistory();
+    const undoHistory = new UndoHistory();
     let finish!: () => void;
     const reverse = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
-    history.record({ ...entry(1, 'first'), reverse });
+    undoHistory.record({ ...action(1, 'first'), reverse });
     const listener = vi.fn();
-    const unsubscribe = history.subscribe(listener);
+    const unsubscribe = undoHistory.subscribe(listener);
 
-    const first = history.undo();
-    expect(history.pending).toBe(true);
+    const first = undoHistory.undo();
+    expect(undoHistory.pending).toBe(true);
     expect(listener).toHaveBeenCalled();
-    expect(await history.undo()).toBeUndefined();
-    expect(await history.redo()).toBeUndefined();
+    expect(await undoHistory.undo()).toBeUndefined();
+    expect(await undoHistory.redo()).toBeUndefined();
     expect(reverse).toHaveBeenCalledTimes(1);
 
     listener.mockClear();
     finish();
     expect((await first)?.recordId).toBe(1);
-    expect(history.pending).toBe(false);
-    expect(history.redoDescription()).toBe('first');
+    expect(undoHistory.pending).toBe(false);
+    expect(undoHistory.nextRedo()?.label).toBe('first');
     expect(listener).toHaveBeenCalled();
 
     unsubscribe();
     listener.mockClear();
-    history.record(entry(2, 'second'));
+    undoHistory.record(action(2, 'second'));
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('keeps an entry where it was when its effect fails', async () => {
-    const history = new UndoHistory();
+  it('keeps a Record action where it was when its effect fails', async () => {
+    const undoHistory = new UndoHistory();
     const failing = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValue(undefined);
-    history.record({ ...entry(1, 'first'), reverse: failing });
+    undoHistory.record({ ...action(1, 'first'), reverse: failing });
 
-    await expect(history.undo()).rejects.toThrow('boom');
-    expect(history.undoDescription()).toBe('first');
-    expect(history.redoDescription()).toBeUndefined();
+    await expect(undoHistory.undo()).rejects.toThrow('boom');
+    expect(undoHistory.nextUndo()?.label).toBe('first');
+    expect(undoHistory.nextRedo()?.label).toBeUndefined();
 
-    expect((await history.undo())?.recordId).toBe(1);
-    expect(history.redoDescription()).toBe('first');
+    expect((await undoHistory.undo())?.recordId).toBe(1);
+    expect(undoHistory.nextRedo()?.label).toBe('first');
   });
 
   describe('failed effects', () => {
@@ -128,61 +129,61 @@ describe('undo history', () => {
     const failOnce = () => vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValue(undefined);
 
     it('leaves both lists unchanged when a failed undo should be retried', async () => {
-      const history = new UndoHistory();
-      history.record(entry(1, 'first'));
-      history.record(entry(2, 'second'));
-      history.record({ ...entry(3, 'third'), reverse: failOnce() });
-      await history.undo().catch(() => undefined); // the one failure
-      await history.undo(); // third
-      await history.redo(); // third again, so the redo list is not empty
-      history.record({ ...entry(4, 'fourth'), reverse: failOnce() });
-      history.record({ ...entry(5, 'fifth'), reverse: failOnce() });
+      const undoHistory = new UndoHistory();
+      undoHistory.record(action(1, 'first'));
+      undoHistory.record(action(2, 'second'));
+      undoHistory.record({ ...action(3, 'third'), reverse: failOnce() });
+      await undoHistory.undo().catch(() => undefined); // the one failure
+      await undoHistory.undo(); // third
+      await undoHistory.redo(); // third again, so the redo list is not empty
+      undoHistory.record({ ...action(4, 'fourth'), reverse: failOnce() });
+      undoHistory.record({ ...action(5, 'fifth'), reverse: failOnce() });
 
-      await expect(history.undo(retry)).rejects.toThrow('boom');
-      expect(history.undoDescription()).toBe('fifth');
-      expect(history.redoDescription()).toBeUndefined();
+      await expect(undoHistory.undo(retry)).rejects.toThrow('boom');
+      expect(undoHistory.nextUndo()?.label).toBe('fifth');
+      expect(undoHistory.nextRedo()?.label).toBeUndefined();
     });
 
-    it('drops only the failing entry when a failed undo should be discarded', async () => {
-      const history = new UndoHistory();
-      history.record(entry(1, 'first'));
-      history.record({ ...entry(2, 'second'), reverse: failOnce() });
-      history.record(entry(3, 'third'));
-      await history.undo();
+    it('drops only the failing Record action when a failed undo should be discarded', async () => {
+      const undoHistory = new UndoHistory();
+      undoHistory.record(action(1, 'first'));
+      undoHistory.record({ ...action(2, 'second'), reverse: failOnce() });
+      undoHistory.record(action(3, 'third'));
+      await undoHistory.undo();
 
-      await expect(history.undo(discard)).rejects.toThrow('boom');
-      expect(history.undoDescription()).toBe('first');
-      expect(history.redoDescription()).toBe('third');
-      expect((await history.undo())?.recordId).toBe(1);
-      expect(await history.undo()).toBeUndefined();
+      await expect(undoHistory.undo(discard)).rejects.toThrow('boom');
+      expect(undoHistory.nextUndo()?.label).toBe('first');
+      expect(undoHistory.nextRedo()?.label).toBe('third');
+      expect((await undoHistory.undo())?.recordId).toBe(1);
+      expect(await undoHistory.undo()).toBeUndefined();
     });
 
     it('leaves both lists unchanged when a failed redo should be retried', async () => {
-      const history = new UndoHistory();
-      history.record({ ...entry(1, 'first'), reapply: failOnce() });
-      await history.undo();
+      const undoHistory = new UndoHistory();
+      undoHistory.record({ ...action(1, 'first'), reapply: failOnce() });
+      await undoHistory.undo();
 
-      await expect(history.redo(retry)).rejects.toThrow('boom');
-      expect(history.redoDescription()).toBe('first');
-      expect(history.undoDescription()).toBeUndefined();
+      await expect(undoHistory.redo(retry)).rejects.toThrow('boom');
+      expect(undoHistory.nextRedo()?.label).toBe('first');
+      expect(undoHistory.nextUndo()?.label).toBeUndefined();
     });
 
-    it('drops only the failing entry when a failed redo should be discarded', async () => {
-      const history = new UndoHistory();
-      history.record(entry(1, 'first'));
-      history.record({ ...entry(2, 'second'), reapply: failOnce() });
-      history.record(entry(3, 'third'));
-      await history.undo();
-      await history.undo();
-      await history.undo();
+    it('drops only the failing Record action when a failed redo should be discarded', async () => {
+      const undoHistory = new UndoHistory();
+      undoHistory.record(action(1, 'first'));
+      undoHistory.record({ ...action(2, 'second'), reapply: failOnce() });
+      undoHistory.record(action(3, 'third'));
+      await undoHistory.undo();
+      await undoHistory.undo();
+      await undoHistory.undo();
 
       // redo list, newest first: first, second, third
-      await history.redo();
-      await expect(history.redo(discard)).rejects.toThrow('boom');
-      expect(history.undoDescription()).toBe('first');
-      expect(history.redoDescription()).toBe('third');
-      expect((await history.redo())?.recordId).toBe(3);
-      expect(await history.redo()).toBeUndefined();
+      await undoHistory.redo();
+      await expect(undoHistory.redo(discard)).rejects.toThrow('boom');
+      expect(undoHistory.nextUndo()?.label).toBe('first');
+      expect(undoHistory.nextRedo()?.label).toBe('third');
+      expect((await undoHistory.redo())?.recordId).toBe(3);
+      expect(await undoHistory.redo()).toBeUndefined();
     });
   });
 
@@ -191,9 +192,10 @@ describe('undo history', () => {
     const store = () => {
       let next = 100;
       const log: string[] = [];
-      const edit = (id: number): UndoEntry => ({
+      const edit = (id: number): RecordAction => ({
         recordId: id,
-        description: `edit ${id}`,
+        label: `edit ${id}`,
+        eventDate: '2026-10-12',
         reverse: (current) => {
           log.push(`update ${current} back`);
           return Promise.resolve();
@@ -203,9 +205,10 @@ describe('undo history', () => {
           return Promise.resolve();
         },
       });
-      const deletion = (id: number): UndoEntry => ({
+      const deletion = (id: number): RecordAction => ({
         recordId: id,
-        description: `delete ${id}`,
+        label: `delete ${id}`,
+        eventDate: '2026-10-12',
         reverse: () => {
           log.push('create');
           return Promise.resolve(next++);
@@ -218,63 +221,63 @@ describe('undo history', () => {
       return { log, edit, deletion };
     };
 
-    it('points earlier entries at the new id after undoing a delete', async () => {
+    it('points earlier Record actions at the new id after undoing a delete', async () => {
       const { log, edit, deletion } = store();
-      const history = new UndoHistory();
-      history.record(edit(5));
-      history.record(deletion(5));
+      const undoHistory = new UndoHistory();
+      undoHistory.record(edit(5));
+      undoHistory.record(deletion(5));
 
-      await history.undo();
-      await history.undo();
+      await undoHistory.undo();
+      await undoHistory.undo();
       expect(log).toEqual(['create', 'update 100 back']);
 
-      await history.redo();
+      await undoHistory.redo();
       expect(log.at(-1)).toBe('update 100 again');
     });
 
-    it('follows the Record through repeated re-creation, in done and undone entries', async () => {
+    it('follows the Record through repeated re-creation, in done and undone Record actions', async () => {
       const { log, edit, deletion } = store();
-      const history = new UndoHistory();
-      history.record(edit(5));
-      history.record(deletion(5));
+      const undoHistory = new UndoHistory();
+      undoHistory.record(edit(5));
+      undoHistory.record(deletion(5));
 
-      await history.undo(); // re-created as 100
-      await history.undo(); // edit undone on 100
-      await history.redo(); // edit redone on 100
-      await history.redo(); // delete redone on 100
-      await history.undo(); // re-created again as 101
+      await undoHistory.undo(); // re-created as 100
+      await undoHistory.undo(); // edit undone on 100
+      await undoHistory.redo(); // edit redone on 100
+      await undoHistory.redo(); // delete redone on 100
+      await undoHistory.undo(); // re-created again as 101
       expect(log).toEqual(['create', 'update 100 back', 'update 100 again', 'remove 100', 'create']);
 
-      await history.undo();
-      await history.redo();
+      await undoHistory.undo();
+      await undoHistory.redo();
       expect(log.slice(-2)).toEqual(['update 101 back', 'update 101 again']);
     });
 
-    it('remaps entries waiting in the undone list when a Record is re-created', async () => {
+    it('remaps Record actions waiting in the undone list when a Record is re-created', async () => {
       const { log, edit, deletion } = store();
-      const history = new UndoHistory();
-      history.record(edit(5));
-      history.record(deletion(5));
-      await history.undo(); // 100; both entries now point at 100
-      await history.undo(); // edit sits in undone
-      await history.redo();
-      await history.redo(); // delete redone on 100
-      await history.undo(); // 101: the edit is in done, the delete in undone
-      await history.undo();
+      const undoHistory = new UndoHistory();
+      undoHistory.record(edit(5));
+      undoHistory.record(deletion(5));
+      await undoHistory.undo(); // 100; both Record actions now point at 100
+      await undoHistory.undo(); // edit sits in undone
+      await undoHistory.redo();
+      await undoHistory.redo(); // delete redone on 100
+      await undoHistory.undo(); // 101: the edit is in done, the delete in undone
+      await undoHistory.undo();
       expect(log.at(-1)).toBe('update 101 back');
-      expect((await history.redo())?.recordId).toBe(101);
+      expect((await undoHistory.redo())?.recordId).toBe(101);
     });
 
-    it('leaves entries for other Records untouched', async () => {
+    it('leaves Record actions for other Records untouched', async () => {
       const { log, edit, deletion } = store();
-      const history = new UndoHistory();
-      history.record(edit(7));
-      history.record(edit(5));
-      history.record(deletion(5));
+      const undoHistory = new UndoHistory();
+      undoHistory.record(edit(7));
+      undoHistory.record(edit(5));
+      undoHistory.record(deletion(5));
 
-      await history.undo();
-      await history.undo();
-      await history.undo();
+      await undoHistory.undo();
+      await undoHistory.undo();
+      await undoHistory.undo();
       expect(log).toEqual(['create', 'update 100 back', 'update 7 back']);
     });
   });

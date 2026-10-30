@@ -3,8 +3,7 @@ import { addExpense, deleteExpense, getExpenses, updateExpense } from '../api';
 import { formatDate, formatMoney, today } from '../format';
 import { isHuf } from '../validation';
 import type { ExpenseRecord, ExpenseRequest } from '@car-tracker/contracts';
-import type { UndoHistory } from '../undoHistory';
-import { Panel } from './Panel';
+import { Panel, type RecordPanelProps } from './Panel';
 import { RecordTable, type RecordTableColumn } from './RecordTable';
 
 const initial = (): ExpenseRequest => ({ eventDate: today(), amount: '', notes: '' });
@@ -14,7 +13,7 @@ const columns: RecordTableColumn<ExpenseRecord>[] = [
   { header: 'Notes', render: (record) => record.notes ?? '—' },
 ];
 
-export function ExpensesPanel({ carId, history, visible }: { carId: number; history: UndoHistory; visible: boolean }) {
+export function ExpensesPanel({ carId, undoHistory, visible }: RecordPanelProps) {
   const load = useCallback(() => getExpenses(carId), [carId]);
   const submit = useCallback((value: ExpenseRequest) => addExpense(carId, value), [carId]);
   const update = useCallback((id: number, value: ExpenseRequest) => updateExpense(carId, id, value), [carId]);
@@ -22,7 +21,7 @@ export function ExpensesPanel({ carId, history, visible }: { carId: number; hist
   return (
     <Panel
       title="Expenses"
-      history={history}
+      undoHistory={undoHistory}
       visible={visible}
       load={load}
       submit={submit}
