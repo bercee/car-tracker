@@ -49,8 +49,8 @@ npm run dev:frontend
 ```
 
 Vite proxies relative `/api` requests to `http://localhost:3000` during local
-development. Start the backend first (optionally with a disposable
-`DATABASE_PATH`), then open the Vite URL shown in the frontend terminal.
+development. Start the backend first, then open the Vite URL shown in the
+frontend terminal.
 
 ### Backend environment
 
@@ -58,16 +58,22 @@ The backend accepts these environment variables:
 
 - `HOST`: listen address; defaults to `0.0.0.0`.
 - `PORT`: integer from `1` through `65535`; defaults to `3000`.
-- `DATABASE_PATH`: SQLite file path. It defaults to `./data/car.sqlite`
-  relative to the backend working directory during local development and
-  `/data/car.sqlite` when `NODE_ENV=production`.
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`: PostgreSQL
+  connection parameters, passed to the driver separately (never as a URL, so
+  passwords may contain `@` or `/`). `DB_PORT` is an integer from `1` through
+  `65535`. Outside production they default to the development container
+  below (`127.0.0.1:5432`, database, user and password `car_tracker`); with
+  `NODE_ENV=production` all five are required.
 
-The database parent directory and idempotent schema are created at startup.
-For a disposable local API, run from the repository root:
+### Development database
+
+Start a PostgreSQL 17 container published on `127.0.0.1:5432` only:
 
 ```bash
-DATABASE_PATH=/tmp/car-tracker-dev.sqlite npm run dev:backend
+npm run db:up
 ```
+
+`npm run db:down` stops it; data persists in a Docker volume.
 
 The API endpoints are:
 
