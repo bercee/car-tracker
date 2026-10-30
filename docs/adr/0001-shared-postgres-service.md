@@ -4,13 +4,13 @@ The car tracker moves from an embedded SQLite file to PostgreSQL running as a se
 
 Each app gets its own database and its own role on the shared PostgreSQL 17 server (`car_tracker` database, `car_tracker` role). The role has no privileges on other apps' databases. Each app owns and runs its own migrations. Apps do not read each other's data directly.
 
-Provisioning is part of this migration's delivery, although an operator performs it in the separate shared-service deployment rather than in this checkout. The app repository owns the required topology, least-privilege SQL, credentials contract, and verification procedure in [the shared-service runbook](../shared-postgres-service.md).
+The shared server is operated from the home-server deployment repo (`bercee/docker-services`, `postgres/`), which owns its topology, provisioning and verification: [Shared Postgres README](https://github.com/bercee/docker-services/blob/main/postgres/README.md). This repository owns only how Car Tracker uses it, see [the migration guide](../postgres-migration.md).
 
 ## Consequences
 
 - Backup and restore automation is deliberately deferred. It must be designed before the database holds data that needs to be retained; per-app restore will be possible with `pg_dump` of one database.
 - Postgres being down takes every dependent app down; the backend health check must reflect database reachability.
-- Provisioning a new app needs a one-time `CREATE ROLE` / `CREATE DATABASE` in the shared-service deployment, following the runbook.
+- Provisioning a new app needs a one-time `CREATE ROLE` / `CREATE DATABASE` in the shared-service deployment, following the Shared Postgres README.
 - The `./data` volume and `DATABASE_PATH` configuration go away. The backend receives separately validated `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` values, rather than a connection URL.
 
 ## Considered options

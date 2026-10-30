@@ -1,6 +1,6 @@
 # Postgres port: sequenced issues (draft)
 
-Draft for `bercee/car-tracker`. Context: [ADR 0001](adr/0001-shared-postgres-service.md), [ADR 0002](adr/0002-drizzle-and-migration-flow.md), [the shared-service runbook](shared-postgres-service.md), and [GLOSSARY.md](../GLOSSARY.md). Multi-car support is complete, so the baseline migration can use its shipped schema. This is a clean PostgreSQL start: the application neither imports nor deletes the existing SQLite file.
+Draft for `bercee/car-tracker`. Context: [ADR 0001](adr/0001-shared-postgres-service.md), [ADR 0002](adr/0002-drizzle-and-migration-flow.md), [the migration guide](postgres-migration.md), and [GLOSSARY.md](../GLOSSARY.md). Multi-car support is complete, so the baseline migration can use its shipped schema. This is a clean PostgreSQL start: the application neither imports nor deletes the existing SQLite file.
 
 Create with `gh issue create`; then record blockers per `docs/agents/issue-tracker.md` (native dependencies, or a `Blocked by:` line at the top of the body).
 
@@ -10,7 +10,7 @@ Create with `gh issue create`; then record blockers per `docs/agents/issue-track
 
 Blocked by: none. Executed outside this repo in the shared-service deployment.
 
-Provision PostgreSQL 17, the external `database` Docker network, and the `car_tracker` database and role on the shared server. The role owns that database and has no privileges on other applications' databases. Postgres publishes no port in production. The operator executes the concrete procedure in [the shared-service runbook](shared-postgres-service.md), which is part of this project's delivery even though the service deployment lives elsewhere.
+Provision PostgreSQL 17, the external `database` Docker network, and the `car_tracker` database and role on the shared server. The role owns that database and has no privileges on other applications' databases. Postgres publishes no port in production. The operator follows the [Shared Postgres README](https://github.com/bercee/docker-services/blob/main/postgres/README.md) in `bercee/docker-services`, then step 1 of [the migration guide](postgres-migration.md).
 
 Done when: a client on the `database` network can connect as `car_tracker` to `car_tracker` and cannot connect to any other database.
 
