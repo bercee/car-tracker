@@ -4,7 +4,7 @@ The car tracker moves from an embedded SQLite file to PostgreSQL running as a se
 
 Each app gets its own database and its own role on the shared PostgreSQL 17 server (`car_tracker` database, `car_tracker` role). The role has no privileges on other apps' databases. Each app owns and runs its own migrations. Apps do not read each other's data directly.
 
-The shared server is operated from the home-server deployment repo (`bercee/docker-services`, `postgres/`), which owns its topology, provisioning and verification: [Shared Postgres README](https://github.com/bercee/docker-services/blob/main/postgres/README.md). This repository owns only how Car Tracker uses it, see [the migration guide](../postgres-migration.md).
+The shared server is operated from the home-server deployment repo (`bercee/docker-services`, `postgres/`), which owns its topology, provisioning and verification: [Shared Postgres README](https://github.com/bercee/docker-services/blob/main/postgres/README.md). This repository owns only how Car Tracker uses it.
 
 ## Consequences
 
