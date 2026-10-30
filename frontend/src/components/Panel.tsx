@@ -15,7 +15,7 @@ export interface PanelProps<T extends { eventDate: string }, R extends { id: num
   title: string;
   history: UndoHistory;
   load: () => Promise<R[]>;
-  submit: (value: T) => Promise<unknown>;
+  submit: (value: T) => Promise<R>;
   update: (id: number, value: T) => Promise<unknown>;
   remove: (id: number) => Promise<void>;
   toFormValue: (record: R) => T;
@@ -99,8 +99,18 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
     setError(undefined);
     setMessage(undefined);
     try {
+      let created: R | undefined;
       if (wasEditing) await update(editingId!, value);
-      else await submit(value);
+      else created = await submit(value);
+      if (created) {
+        const after = value;
+        history.record({
+          recordId: created.id,
+          description: `add of ${title} record from ${after.eventDate}`,
+          reverse: async (id) => remove(id),
+          reapply: async () => (await submit(after)).id,
+        });
+      }
       if (previous) {
         const id = previous.id;
         const before = toFormValue(previous);
@@ -108,8 +118,8 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
         history.record({
           recordId: id,
           description: `edit of ${title} record from ${before.eventDate}`,
-          reverse: async () => void (await update(id, before)),
-          reapply: async () => void (await update(id, after)),
+          reverse: async (current) => void (await update(current, before)),
+          reapply: async (current) => void (await update(current, after)),
         });
       }
       if (!isMounted()) return;
@@ -153,12 +163,18 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
     }
   };
   const onDelete = async (record: R) => {
-    if (!window.confirm(`Delete this ${title} record? This cannot be undone.`)) return;
     setPending(true);
     setError(undefined);
     setMessage(undefined);
     try {
       await remove(record.id);
+      const before = toFormValue(record);
+      history.record({
+        recordId: record.id,
+        description: `delete of ${title} record from ${before.eventDate}`,
+        reverse: async () => (await submit(before)).id,
+        reapply: async (id) => remove(id),
+      });
       if (!isMounted()) return;
       if (editingId === record.id) {
         setEditingId(undefined);
