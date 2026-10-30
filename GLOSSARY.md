@@ -1,6 +1,6 @@
 # Car Tracker
 
-A personal tool for logging what a person's cars consume and cost: fuel, AdBlue and other expenses. It has one user, who may own several cars.
+A personal tool for logging what a person's cars consume and cost: fuel, AdBlue and other expenses. It has one user, who may own several cars. All money is in whole Hungarian forints (HUF); volumes are in liters.
 
 ## Language
 
@@ -21,6 +21,10 @@ _Avoid_: Entry, log
 **Record type**:
 The kind of a Record: Fuel, AdBlue or Expenses.
 _Avoid_: Category
+
+**Price**:
+What a Record cost, in whole HUF. Every Record type, an expense included, has a Price.
+_Avoid_: Amount, cost
 
 ### Screen
 
