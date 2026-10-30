@@ -2,8 +2,6 @@ import type { ErrorRequestHandler } from 'express';
 import { ZodError } from 'zod';
 import type { ErrorCode, ErrorEnvelope } from '@car-tracker/contracts';
 
-import { ValidationError } from './validation/common.js';
-
 export type { ErrorCode, ErrorEnvelope } from '@car-tracker/contracts';
 
 export class HttpError extends Error {
@@ -23,10 +21,6 @@ export class HttpError extends Error {
 export function toHttpError(error: unknown): HttpError {
   if (error instanceof HttpError) {
     return error;
-  }
-
-  if (error instanceof ValidationError) {
-    return new HttpError(400, 'VALIDATION_ERROR', error.message, error.field);
   }
 
   if (error instanceof ZodError) {
