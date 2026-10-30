@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 
 import { ApiError } from '../api';
 import { useIsMounted } from '../useIsMounted';
+import type { UndoHistory } from '../undoHistory';
 import { StatusMessage } from './StatusMessage';
 
 export interface PanelActions<R> {
@@ -10,8 +11,9 @@ export interface PanelActions<R> {
   disabled: boolean;
 }
 
-export interface PanelProps<T, R extends { id: number }> {
+export interface PanelProps<T extends { eventDate: string }, R extends { id: number }> {
   title: string;
+  history: UndoHistory;
   load: () => Promise<R[]>;
   submit: (value: T) => Promise<unknown>;
   update: (id: number, value: T) => Promise<unknown>;
@@ -23,8 +25,9 @@ export interface PanelProps<T, R extends { id: number }> {
   table: (records: R[], actions: PanelActions<R>) => ReactNode;
 }
 
-export function Panel<T, R extends { id: number }>({
+export function Panel<T extends { eventDate: string }, R extends { id: number }>({
   title,
+  history,
   load,
   submit,
   update,
@@ -91,12 +94,24 @@ export function Panel<T, R extends { id: number }>({
       return;
     }
     const wasEditing = editingId !== undefined;
+    const previous = wasEditing ? records.find((record) => record.id === editingId) : undefined;
     setPending(true);
     setError(undefined);
     setMessage(undefined);
     try {
       if (wasEditing) await update(editingId!, value);
       else await submit(value);
+      if (previous) {
+        const id = previous.id;
+        const before = toFormValue(previous);
+        const after = value;
+        history.record({
+          recordId: id,
+          description: `edit of ${title} record from ${before.eventDate}`,
+          reverse: async () => void (await update(id, before)),
+          reapply: async () => void (await update(id, after)),
+        });
+      }
       if (!isMounted()) return;
       setValue(initial());
       setEditingId(undefined);
@@ -105,6 +120,33 @@ export function Panel<T, R extends { id: number }>({
     } catch (cause) {
       if (isMounted()) {
         setError(cause instanceof ApiError ? cause.message : `Unable to ${wasEditing ? 'update' : 'save'} the record.`);
+      }
+    } finally {
+      if (isMounted()) setPending(false);
+    }
+  };
+  const applyUndoRedo = async (verb: 'Undo' | 'Redo') => {
+    setPending(true);
+    setError(undefined);
+    setMessage(undefined);
+    try {
+      const entry = await (verb === 'Undo' ? history.undo() : history.redo());
+      if (!isMounted() || !entry) return;
+      if (editingId === entry.recordId) {
+        setEditingId(undefined);
+        setValue(initial());
+      }
+      setMessage(`${verb === 'Undo' ? 'Undid' : 'Redid'} ${entry.description.replace(/ from .*$/, '')}.`);
+      await refresh();
+    } catch (cause) {
+      if (isMounted()) {
+        const what = (verb === 'Undo' ? history.undoDescription() : history.redoDescription())?.replace(
+          / from .*$/,
+          '',
+        );
+        setError(
+          cause instanceof ApiError ? cause.message : `Unable to ${verb.toLowerCase()} ${what ?? 'the action'}.`,
+        );
       }
     } finally {
       if (isMounted()) setPending(false);
@@ -156,6 +198,22 @@ export function Panel<T, R extends { id: number }>({
           )}
         </fieldset>
       </form>
+      <div className="undo-redo">
+        {(['Undo', 'Redo'] as const).map((verb) => {
+          const description = verb === 'Undo' ? history.undoDescription() : history.redoDescription();
+          return (
+            <button
+              key={verb}
+              type="button"
+              disabled={pending || description === undefined}
+              aria-label={description === undefined ? verb : `${verb} ${description}`}
+              onClick={() => void applyUndoRedo(verb)}
+            >
+              {verb}
+            </button>
+          );
+        })}
+      </div>
       <StatusMessage message={error} error />
       <StatusMessage message={message} />
       {loading ? (
