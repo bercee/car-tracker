@@ -94,6 +94,70 @@ describe('undo history', () => {
     expect(history.redoDescription()).toBe('first');
   });
 
+  describe('failed effects', () => {
+    const discard = () => true;
+    const retry = () => false;
+    const failOnce = () => vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValue(undefined);
+
+    it('leaves both lists unchanged when a failed undo should be retried', async () => {
+      const history = new UndoHistory();
+      history.record(entry(1, 'first'));
+      history.record(entry(2, 'second'));
+      history.record({ ...entry(3, 'third'), reverse: failOnce() });
+      await history.undo().catch(() => undefined); // the one failure
+      await history.undo(); // third
+      await history.redo(); // third again, so the redo list is not empty
+      history.record({ ...entry(4, 'fourth'), reverse: failOnce() });
+      history.record({ ...entry(5, 'fifth'), reverse: failOnce() });
+
+      await expect(history.undo(retry)).rejects.toThrow('boom');
+      expect(history.undoDescription()).toBe('fifth');
+      expect(history.redoDescription()).toBeUndefined();
+    });
+
+    it('drops only the failing entry when a failed undo should be discarded', async () => {
+      const history = new UndoHistory();
+      history.record(entry(1, 'first'));
+      history.record({ ...entry(2, 'second'), reverse: failOnce() });
+      history.record(entry(3, 'third'));
+      await history.undo();
+
+      await expect(history.undo(discard)).rejects.toThrow('boom');
+      expect(history.undoDescription()).toBe('first');
+      expect(history.redoDescription()).toBe('third');
+      expect((await history.undo())?.recordId).toBe(1);
+      expect(await history.undo()).toBeUndefined();
+    });
+
+    it('leaves both lists unchanged when a failed redo should be retried', async () => {
+      const history = new UndoHistory();
+      history.record({ ...entry(1, 'first'), reapply: failOnce() });
+      await history.undo();
+
+      await expect(history.redo(retry)).rejects.toThrow('boom');
+      expect(history.redoDescription()).toBe('first');
+      expect(history.undoDescription()).toBeUndefined();
+    });
+
+    it('drops only the failing entry when a failed redo should be discarded', async () => {
+      const history = new UndoHistory();
+      history.record(entry(1, 'first'));
+      history.record({ ...entry(2, 'second'), reapply: failOnce() });
+      history.record(entry(3, 'third'));
+      await history.undo();
+      await history.undo();
+      await history.undo();
+
+      // redo list, newest first: first, second, third
+      await history.redo();
+      await expect(history.redo(discard)).rejects.toThrow('boom');
+      expect(history.undoDescription()).toBe('first');
+      expect(history.redoDescription()).toBe('third');
+      expect((await history.redo())?.recordId).toBe(3);
+      expect(await history.redo()).toBeUndefined();
+    });
+  });
+
   describe('re-created records', () => {
     // A fake record store: create hands out new ids, remove forgets them.
     const store = () => {

@@ -136,11 +136,14 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
     }
   };
   const applyUndoRedo = async (verb: 'Undo' | 'Redo') => {
+    const what = (verb === 'Undo' ? history.undoDescription() : history.redoDescription())?.replace(/ from .*$/, '');
     setPending(true);
     setError(undefined);
     setMessage(undefined);
     try {
-      const entry = await (verb === 'Undo' ? history.undo() : history.redo());
+      // A network failure keeps the entry for a retry; any other API failure drops it.
+      const discard = (cause: unknown) => cause instanceof ApiError && cause.kind !== 'network';
+      const entry = await (verb === 'Undo' ? history.undo(discard) : history.redo(discard));
       if (!isMounted() || !entry) return;
       if (editingId === entry.recordId) {
         setEditingId(undefined);
@@ -150,10 +153,6 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
       await refresh();
     } catch (cause) {
       if (isMounted()) {
-        const what = (verb === 'Undo' ? history.undoDescription() : history.redoDescription())?.replace(
-          / from .*$/,
-          '',
-        );
         setError(
           cause instanceof ApiError ? cause.message : `Unable to ${verb.toLowerCase()} ${what ?? 'the action'}.`,
         );
