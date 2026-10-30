@@ -2,11 +2,6 @@ name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: Semantic version to release, e.g. 0.2.0
-        required: true
-        type: string
 
 concurrency:
   group: release
@@ -18,6 +13,8 @@ permissions:
 jobs:
   preflight:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Require main branch
         run: |
@@ -25,18 +22,21 @@ jobs:
             echo "::error::Releases can only run from main (ref: $GITHUB_REF)"
             exit 1
           fi
-      - name: Validate version
-        env:
-          VERSION: ${{ inputs.version }}
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Read version from package.json
+        id: version
         run: |
-          if ! printf '%s' "$VERSION" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
-            echo "::error::Version must look like 1.2.3 (got: $VERSION)"
+          version=$(node -p "require('./package.json').version")
+          if ! printf '%s' "$version" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "::error::package.json version must look like 1.2.3 (got: $version)"
             exit 1
           fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Require unused tag
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           if gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v$VERSION" --jq '.[].ref' | grep -qx "refs/tags/v$VERSION"; then
             echo "::error::Tag v$VERSION already exists"
@@ -62,7 +62,7 @@ jobs:
       - run: npm run build
 
   publish-images:
-    needs: verify
+    needs: [preflight, verify]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -92,8 +92,8 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
           tags: |
-            type=raw,value=${{ inputs.version }}
-            type=match,pattern=(\d+\.\d+)\.\d+,group=1,value=${{ inputs.version }}
+            type=raw,value=${{ needs.preflight.outputs.version }}
+            type=match,pattern=(\d+\.\d+)\.\d+,group=1,value=${{ needs.preflight.outputs.version }}
             type=sha,prefix=sha-,format=long
             type=raw,value=latest
       - name: Publish image
@@ -109,7 +109,7 @@ jobs:
           platforms: linux/amd64
 
   github-release:
-    needs: publish-images
+    needs: [preflight, publish-images]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -117,10 +117,39 @@ jobs:
       - name: Create tag and GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ needs.preflight.outputs.version }}
         run: |
           gh release create "v$VERSION" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "v$VERSION" \
             --generate-notes
+
+  bump-version:
+    needs: [preflight, github-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+          token: ${{ secrets.RELEASE_TOKEN }}
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: Bump patch version and push
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          current=$(node -p "require('./package.json').version")
+          if [ "$current" != "$VERSION" ]; then
+            echo "main is already at $current, not $VERSION; skipping bump"
+            exit 0
+          fi
+          npm version patch --workspaces --include-workspace-root --no-git-tag-version
+          next=$(node -p "require('./package.json').version")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Bump version to $next"
+          git push origin HEAD:main
