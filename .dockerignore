@@ -9,9 +9,6 @@ dist
 coverage
 **/coverage
 data
-*.sqlite
-*.sqlite-shm
-*.sqlite-wal
 *.db
 *.db-shm
 *.db-wal

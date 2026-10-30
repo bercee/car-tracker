@@ -133,8 +133,7 @@ export function parseHufAmount(value: unknown, field: string, maximum: number): 
   return Number(amount);
 }
 
-export function formatScaledInteger(value: bigint | number, scale: number): string {
-  const integer = toSafeInteger(value, 'stored decimal');
+export function formatScaledInteger(integer: number, scale: number): string {
   if (integer < 0) {
     throw new RangeError('stored decimal must not be negative');
   }
@@ -143,8 +142,7 @@ export function formatScaledInteger(value: bigint | number, scale: number): stri
   return `${digits.slice(0, -scale)}.${digits.slice(-scale)}`;
 }
 
-export function formatHufAmount(value: bigint | number): string {
-  const integer = toSafeInteger(value, 'stored HUF amount');
+export function formatHufAmount(integer: number): string {
   if (integer < 0) {
     throw new RangeError('stored HUF amount must not be negative');
   }
@@ -167,13 +165,4 @@ export function normalizeOptionalText(value: unknown, field: string, maximumLeng
   }
 
   return normalized === '' ? null : normalized;
-}
-
-export function toSafeInteger(value: bigint | number, field: string): number {
-  const integer = typeof value === 'bigint' ? Number(value) : value;
-  if (!Number.isSafeInteger(integer)) {
-    throw new RangeError(`${field} is outside the JavaScript safe-integer range`);
-  }
-
-  return integer;
 }

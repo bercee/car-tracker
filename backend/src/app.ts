@@ -7,16 +7,20 @@ import { createExpensesRouter } from './routes/expenses.js';
 import { createCarScope } from './routes/carScope.js';
 import { createCarsRouter } from './routes/cars.js';
 import { createFuelRouter } from './routes/fuel.js';
-import { createHealthRouter } from './routes/health.js';
+import { createHealthRouter, type HealthCheck } from './routes/health.js';
 
-export function createApp(database: CarDatabase, logger: Pick<Console, 'error'> = console): express.Express {
+export function createApp(
+  database: CarDatabase,
+  checkHealth: HealthCheck,
+  logger: Pick<Console, 'error'> = console,
+): express.Express {
   const app = express();
   app.disable('x-powered-by');
 
   const carScope = createCarScope(database);
   const limitJsonBodySize = express.json({ limit: '16kb' });
   app.use('/api/cars', requireJsonForBody, limitJsonBodySize);
-  app.use('/api/health', createHealthRouter(database));
+  app.use('/api/health', createHealthRouter(checkHealth));
   app.use('/api/cars/:carId/fuel', carScope, createFuelRouter(database));
   app.use('/api/cars/:carId/adblue', carScope, createAdBlueRouter(database));
   app.use('/api/cars/:carId/expenses', carScope, createExpensesRouter(database));

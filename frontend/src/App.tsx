@@ -17,7 +17,7 @@ enum Section {
 
 const recordSections = [Section.Fuel, Section.AdBlue, Section.Expenses];
 
-// Folds only ASCII A-Z, matching SQLite's NOCASE collation used by the backend.
+// Folds only ASCII A-Z, matching the backend's car ordering (see PostgresCarDatabase.listCars).
 const foldAscii = (name: string) => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
 const byName = (a: Car, b: Car) => {
   const left = foldAscii(a.name);

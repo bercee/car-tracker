@@ -1,25 +1,36 @@
-import path from 'node:path';
-
 import { describe, expect, it } from 'vitest';
 
 import { loadConfig } from '../../src/config.js';
 
+const productionDatabase = {
+  NODE_ENV: 'production',
+  DB_HOST: 'postgres',
+  DB_PORT: '5432',
+  DB_NAME: 'car_tracker',
+  DB_USER: 'car_tracker',
+  DB_PASSWORD: 's3cret',
+};
+
 describe('application configuration', () => {
-  it('uses HTTP and database defaults', () => {
-    expect(loadConfig({}, '/work/backend')).toEqual({
+  it('uses HTTP and development database defaults', () => {
+    expect(loadConfig({})).toEqual({
       host: '0.0.0.0',
       port: 3000,
-      databasePath: path.resolve('/work/backend/data/car.sqlite'),
+      database: {
+        host: '127.0.0.1',
+        port: 5432,
+        name: 'car_tracker',
+        user: 'car_tracker',
+        password: 'car_tracker',
+      },
     });
   });
 
   it('accepts valid overrides', () => {
-    expect(
-      loadConfig({ HOST: '127.0.0.1', PORT: '4321', DATABASE_PATH: './temporary.sqlite' }, '/work/backend'),
-    ).toEqual({
+    expect(loadConfig({ ...productionDatabase, HOST: '127.0.0.1', PORT: '4321' })).toEqual({
       host: '127.0.0.1',
       port: 4321,
-      databasePath: '/work/backend/temporary.sqlite',
+      database: { host: 'postgres', port: 5432, name: 'car_tracker', user: 'car_tracker', password: 's3cret' },
     });
   });
 
@@ -33,24 +44,48 @@ describe('application configuration', () => {
 });
 
 describe('database configuration', () => {
-  it('uses a local development database by default', () => {
-    expect(loadConfig({}, '/work/backend').databasePath).toBe(path.resolve('/work/backend/data/car.sqlite'));
+  it.each(['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'])('requires %s in production', (key) => {
+    const environment: NodeJS.ProcessEnv = { ...productionDatabase };
+    delete environment[key];
+
+    expect(() => loadConfig(environment)).toThrow(`${key} must be set in production`);
   });
 
-  it('uses the production volume path in production', () => {
-    expect(loadConfig({ NODE_ENV: 'production' }, '/work/backend').databasePath).toBe('/data/car.sqlite');
+  it.each(['@', '/', 'p@ss/w:rd?#%', 'a@b/c@d/', ' padded ', 'üñí'])(
+    'passes the password %j through unchanged',
+    (password) => {
+      expect(loadConfig({ ...productionDatabase, DB_PASSWORD: password }).database.password).toBe(password);
+    },
+  );
+
+  it.each(['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'])('rejects an empty %s', (key) => {
+    expect(() => loadConfig({ ...productionDatabase, [key]: '' })).toThrow(`${key} must be a non-empty valid value`);
   });
 
-  it('resolves an explicit relative path and preserves an absolute path', () => {
-    expect(loadConfig({ DATABASE_PATH: './custom.sqlite' }, '/work/backend').databasePath).toBe(
-      '/work/backend/custom.sqlite',
+  it.each(['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'])('rejects a NUL byte in %s', (key) => {
+    expect(() => loadConfig({ ...productionDatabase, [key]: 'a\0b' })).toThrow(
+      `${key} must be a non-empty valid value`,
     );
-    expect(loadConfig({ DATABASE_PATH: '/var/lib/car.sqlite' }, '/work/backend').databasePath).toBe(
-      '/var/lib/car.sqlite',
+  });
+
+  it.each(['DB_HOST', 'DB_NAME', 'DB_USER'])('rejects a blank %s', (key) => {
+    expect(() => loadConfig({ ...productionDatabase, [key]: '  ' })).toThrow(`${key} must be a non-empty valid value`);
+  });
+
+  it.each(['', '0', '-1', '5.5', ' 5432', '65536', 'postgres'])('rejects invalid DB_PORT %s', (port) => {
+    expect(() => loadConfig({ ...productionDatabase, DB_PORT: port })).toThrow(
+      'DB_PORT must be an integer from 1 through 65535',
     );
   });
 
-  it.each(['', '  ', 'bad\0path'])('rejects invalid path %s', (databasePath) => {
-    expect(() => loadConfig({ DATABASE_PATH: databasePath })).toThrow('DATABASE_PATH must be a non-empty valid path');
+  it('accepts the port range limits', () => {
+    expect(loadConfig({ ...productionDatabase, DB_PORT: '1' }).database.port).toBe(1);
+    expect(loadConfig({ ...productionDatabase, DB_PORT: '65535' }).database.port).toBe(65_535);
+  });
+
+  it('never exposes a connection URL', () => {
+    const { database } = loadConfig({ ...productionDatabase, DB_PASSWORD: 'p@ss/word' });
+
+    expect(Object.keys(database).sort()).toEqual(['host', 'name', 'password', 'port', 'user']);
   });
 });

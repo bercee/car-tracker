@@ -23,6 +23,8 @@
     "format:check": "prettier --check .",
     "test": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "db:up": "docker compose -f deploy/compose.dev.yml up -d --wait",
+    "db:down": "docker compose -f deploy/compose.dev.yml down",
     "build": "npm run build --workspaces --if-present",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build"
   },
@@ -39,7 +41,9 @@
     "typescript-eslint": "^8.70.0"
   },
   "allowScripts": {
-    "better-sqlite3@13.0.3": true,
-    "esbuild@0.28.2": true
+    "esbuild@0.28.2": true,
+    "@embedded-postgres/linux-x64@17.10.0-beta.17": true,
+    "esbuild@0.25.12": false,
+    "esbuild@0.18.20": false
   }
 }

@@ -1,13 +1,13 @@
 import { Router } from 'express';
 
-import type { CarDatabase } from '../database/carDatabase.js';
+export type HealthCheck = () => Promise<void>;
 
-export function createHealthRouter(database: Pick<CarDatabase, 'checkHealth'>): Router {
+export function createHealthRouter(checkHealth: HealthCheck): Router {
   const router = Router();
 
-  router.get('/', (_request, response) => {
+  router.get('/', async (_request, response) => {
     try {
-      database.checkHealth();
+      await checkHealth();
       response.status(200).json({ status: 'ok' });
     } catch {
       response.status(503).json({ status: 'unavailable' });

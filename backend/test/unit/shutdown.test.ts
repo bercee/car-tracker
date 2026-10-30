@@ -11,7 +11,12 @@ describe('shutdown coordinator', () => {
         callback();
       },
     };
-    const database = { close: vi.fn(() => events.push('database')) };
+    const database = {
+      close: vi.fn(() => {
+        events.push('database');
+        return Promise.resolve();
+      }),
+    };
     const exit = vi.fn((code: number) => events.push(`exit:${code}`));
     const shutdown = createShutdownCoordinator(server, database, { exit });
 
@@ -24,7 +29,7 @@ describe('shutdown coordinator', () => {
   it('closes the database and exits non-zero when server shutdown fails', async () => {
     const failure = new Error('close failed');
     const server: ClosableServer = { close: (callback) => callback(failure) };
-    const database = { close: vi.fn() };
+    const database = { close: vi.fn(() => Promise.resolve()) };
     const exit = vi.fn();
     const logger = { error: vi.fn() };
 
@@ -40,9 +45,7 @@ describe('shutdown coordinator', () => {
     const databaseFailure = new Error('database close failed');
     const server: ClosableServer = { close: (callback) => callback(serverFailure) };
     const database = {
-      close: () => {
-        throw databaseFailure;
-      },
+      close: () => Promise.reject(databaseFailure),
     };
     const exit = vi.fn();
     const logger = { error: vi.fn() };

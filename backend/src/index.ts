@@ -1,12 +1,13 @@
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
-import { openDatabase } from './db.js';
+import { PostgresCarDatabase } from './database/postgresCarDatabase.js';
+import { createPostgresConnection } from './database/postgres.js';
 import { createShutdownCoordinator } from './shutdown.js';
 
 try {
   const config = loadConfig();
-  const database = openDatabase(config.databasePath);
-  const app = createApp(database);
+  const postgres = createPostgresConnection(config.database);
+  const app = createApp(new PostgresCarDatabase(postgres.db), postgres.checkHealth);
   const server = app.listen(config.port, config.host);
   server.once('listening', () => {
     console.log(`Car Tracker backend listening on http://${config.host}:${config.port}`);
@@ -15,7 +16,7 @@ try {
     console.error('Failed to start Car Tracker backend', error);
     process.exit(1);
   });
-  const shutdown = createShutdownCoordinator(server, database);
+  const shutdown = createShutdownCoordinator(server, postgres);
 
   process.once('SIGTERM', () => void shutdown('SIGTERM'));
   process.once('SIGINT', () => void shutdown('SIGINT'));

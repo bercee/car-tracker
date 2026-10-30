@@ -1,83 +1,50 @@
 import type { AdBlueRecord, Car, ExpenseRecord, FuelRecord } from '../domain.js';
-import { formatHufAmount, formatScaledInteger, toSafeInteger } from '../validation/common.js';
+import type { adblue, cars, expenses, fuel } from './schema.js';
+import { formatHufAmount, formatScaledInteger } from '../validation/common.js';
 
-export interface CarRow {
-  id: bigint | number;
-  name: string;
-  created_at: string;
-}
-
-export interface FuelRow {
-  id: bigint | number;
-  event_date: string;
-  created_at: string;
-  odometer_km: bigint | number;
-  liters_milliliters: bigint | number;
-  price_huf: bigint | number;
-  full_tank: bigint | number;
-  remark: string | null;
-}
-
-export interface AdBlueRow {
-  id: bigint | number;
-  event_date: string;
-  created_at: string;
-  odometer_km: bigint | number;
-  liters_milliliters: bigint | number;
-  price_huf: bigint | number;
-}
-
-export interface ExpenseRow {
-  id: bigint | number;
-  event_date: string;
-  created_at: string;
-  amount_huf: bigint | number;
-  notes: string | null;
-}
+export type CarRow = typeof cars.$inferSelect;
+export type FuelRow = typeof fuel.$inferSelect;
+export type AdBlueRow = typeof adblue.$inferSelect;
+export type ExpenseRow = typeof expenses.$inferSelect;
 
 export function mapCarRow(row: CarRow): Car {
   return {
-    id: toSafeInteger(row.id, 'id'),
+    id: row.id,
     name: row.name,
-    createdAt: row.created_at,
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
 export function mapFuelRow(row: FuelRow): FuelRecord {
-  const fullTank = toSafeInteger(row.full_tank, 'full_tank');
-  if (fullTank !== 0 && fullTank !== 1) {
-    throw new RangeError('full_tank must be 0 or 1');
-  }
-
   return {
-    id: toSafeInteger(row.id, 'id'),
-    eventDate: row.event_date,
-    createdAt: row.created_at,
-    odometerKm: toSafeInteger(row.odometer_km, 'odometer_km'),
-    liters: formatScaledInteger(row.liters_milliliters, 3),
-    price: formatHufAmount(row.price_huf),
-    fullTank: fullTank === 1,
+    id: row.id,
+    eventDate: row.eventDate,
+    createdAt: row.createdAt.toISOString(),
+    odometerKm: row.odometerKm,
+    liters: formatScaledInteger(row.litersMilliliters, 3),
+    price: formatHufAmount(row.priceHuf),
+    fullTank: row.fullTank,
     remark: row.remark,
   };
 }
 
 export function mapAdBlueRow(row: AdBlueRow): AdBlueRecord {
   return {
-    id: toSafeInteger(row.id, 'id'),
-    eventDate: row.event_date,
-    createdAt: row.created_at,
-    odometerKm: toSafeInteger(row.odometer_km, 'odometer_km'),
-    liters: formatScaledInteger(row.liters_milliliters, 3),
-    price: formatHufAmount(row.price_huf),
+    id: row.id,
+    eventDate: row.eventDate,
+    createdAt: row.createdAt.toISOString(),
+    odometerKm: row.odometerKm,
+    liters: formatScaledInteger(row.litersMilliliters, 3),
+    price: formatHufAmount(row.priceHuf),
   };
 }
 
 export function mapExpenseRow(row: ExpenseRow): ExpenseRecord {
   return {
-    id: toSafeInteger(row.id, 'id'),
-    eventDate: row.event_date,
-    createdAt: row.created_at,
-    amount: formatHufAmount(row.amount_huf),
+    id: row.id,
+    eventDate: row.eventDate,
+    createdAt: row.createdAt.toISOString(),
+    amount: formatHufAmount(row.amountHuf),
     notes: row.notes,
   };
 }

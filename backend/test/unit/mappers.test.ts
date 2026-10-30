@@ -1,18 +1,29 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapAdBlueRow, mapExpenseRow, mapFuelRow } from '../../src/database/mappers.js';
+import { mapAdBlueRow, mapCarRow, mapExpenseRow, mapFuelRow } from '../../src/database/mappers.js';
+
+const createdAt = new Date('2026-09-16T12:34:56.789Z');
 
 describe('database row mappers', () => {
+  it('maps a car row with an ISO creation timestamp', () => {
+    expect(mapCarRow({ id: 1, name: 'Octavia', createdAt })).toEqual({
+      id: 1,
+      name: 'Octavia',
+      createdAt: '2026-09-16T12:34:56.789Z',
+    });
+  });
+
   it('maps a fuel row with a whole-HUF total price', () => {
     expect(
       mapFuelRow({
-        id: 42n,
-        event_date: '2026-09-15',
-        created_at: '2026-09-16T12:34:56.789Z',
-        odometer_km: 82_450n,
-        liters_milliliters: 47_300n,
-        price_huf: 29_284n,
-        full_tank: 1n,
+        id: 42,
+        carId: 1,
+        eventDate: '2026-09-15',
+        createdAt,
+        odometerKm: 82_450,
+        litersMilliliters: 47_300,
+        priceHuf: 29_284,
+        fullTank: true,
         remark: 'Shell',
       }),
     ).toEqual({
@@ -27,43 +38,23 @@ describe('database row mappers', () => {
     });
   });
 
-  it('maps false full-tank and rejects corrupt Boolean storage', () => {
-    const row = {
-      id: 1,
-      event_date: '2026-09-15',
-      created_at: '2026-09-16T12:34:56.789Z',
-      odometer_km: 1,
-      liters_milliliters: 1,
-      price_huf: 0,
-      full_tank: 0,
-      remark: null,
-    };
-    expect(mapFuelRow(row).fullTank).toBe(false);
-    expect(() => mapFuelRow({ ...row, full_tank: 2 })).toThrow('full_tank must be 0 or 1');
-  });
-
   it('maps an AdBlue row with liters padded and price in whole HUF', () => {
     expect(
       mapAdBlueRow({
-        id: 2n,
-        event_date: '2026-09-15',
-        created_at: '2026-09-16T12:34:56.789Z',
-        odometer_km: 82_450n,
-        liters_milliliters: 10_000n,
-        price_huf: 7490n,
+        id: 2,
+        carId: 1,
+        eventDate: '2026-09-15',
+        createdAt,
+        odometerKm: 82_450,
+        litersMilliliters: 10_000,
+        priceHuf: 7490,
       }),
     ).toMatchObject({ id: 2, liters: '10.000', price: '7490' });
   });
 
   it('maps an expense row with a whole-HUF amount', () => {
     expect(
-      mapExpenseRow({
-        id: 3n,
-        event_date: '2026-09-15',
-        created_at: '2026-09-16T12:34:56.789Z',
-        amount_huf: 32_000n,
-        notes: null,
-      }),
+      mapExpenseRow({ id: 3, carId: 1, eventDate: '2026-09-15', createdAt, amountHuf: 32_000, notes: null }),
     ).toMatchObject({ id: 3, amount: '32000', notes: null });
   });
 });

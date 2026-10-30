@@ -1,8 +1,8 @@
 # Car Tracker
 
 Car Tracker is a small, single-user application for recording fuel,
-AdBlue, and general expenses for one or more vehicles. It has a React frontend and an Express JSON API
-backed by SQLite. The repository is organized as npm workspaces for shared
+AdBlue, and general expenses for one or more cars. It has a React frontend and an Express JSON API
+backed by PostgreSQL. The repository is organized as npm workspaces for shared
 `@car-tracker/contracts`, the backend, and the frontend.
 
 All monetary values are whole Hungarian forints. Fuel and AdBlue total prices,
@@ -11,8 +11,9 @@ HUF input is not accepted. Liter quantities retain three-decimal precision.
 
 ## Prerequisites
 
-- Node.js 24 LTS (the Phase 1 lockfile was produced with Node.js 24.20.0)
-- npm 11 (the Phase 1 lockfile was produced with npm 11.19.0)
+- Node.js 24 LTS (the lockfile was produced with Node.js 24.20.0)
+- npm 11 (the lockfile was produced with npm 11.19.0)
+- Docker with Compose, for the development database and the container builds
 
 Run `nvm use` from the repository root when using nvm. npm installations fail
 on Node versions below 24, and unreviewed dependency install scripts are
@@ -28,7 +29,21 @@ npm ci
 
 ## Development
 
-Run both development processes together:
+Development runs the backend and frontend on the host, against a PostgreSQL
+container. Start the database first (see [Development database](#development-database)):
+
+```bash
+npm run db:up
+```
+
+Apply the database migrations. The backend never migrates on its own, so run
+this on a fresh database and after pulling a change that adds a migration:
+
+```bash
+npm run migrate --workspace backend
+```
+
+Then run both development processes together:
 
 ```bash
 npm run dev
@@ -49,8 +64,8 @@ npm run dev:frontend
 ```
 
 Vite proxies relative `/api` requests to `http://localhost:3000` during local
-development. Start the backend first (optionally with a disposable
-`DATABASE_PATH`), then open the Vite URL shown in the frontend terminal.
+development. Start the backend first, then open the Vite URL shown in the
+frontend terminal. `Ctrl+C` closes the HTTP server and the PostgreSQL pool.
 
 ### Backend environment
 
@@ -58,16 +73,38 @@ The backend accepts these environment variables:
 
 - `HOST`: listen address; defaults to `0.0.0.0`.
 - `PORT`: integer from `1` through `65535`; defaults to `3000`.
-- `DATABASE_PATH`: SQLite file path. It defaults to `./data/car.sqlite`
-  relative to the backend working directory during local development and
-  `/data/car.sqlite` when `NODE_ENV=production`.
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`: PostgreSQL
+  connection parameters, passed to the driver separately (never as a URL, so
+  passwords may contain `@` or `/`). `DB_PORT` is an integer from `1` through
+  `65535`. Outside production they default to the development container
+  below (`127.0.0.1:5432`, database, user and password `car_tracker`); with
+  `NODE_ENV=production` all five are required.
 
-The database parent directory and idempotent schema are created at startup.
-For a disposable local API, run from the repository root:
+### Development database
+
+`deploy/compose.dev.yml` defines a single PostgreSQL 17 service and no
+application containers. Start it, published on `127.0.0.1:5432` only:
 
 ```bash
-DATABASE_PATH=/tmp/car-tracker-dev.sqlite npm run dev:backend
+npm run db:up
 ```
+
+`npm run db:down` stops it; data persists in a Docker volume.
+
+### Schema changes
+
+The schema is defined in `backend/src/schema.ts`. After changing it, generate
+a new SQL migration into `backend/drizzle/` and commit it with the schema
+change:
+
+```bash
+cd backend && npx drizzle-kit generate --name <short-description>
+```
+
+Migrations run in order through the `migrate` entry point, both in development
+and in the deployed `migrate` service.
+
+## API
 
 The API endpoints are:
 
@@ -112,6 +149,11 @@ curl -X PUT http://127.0.0.1:3000/api/cars/1/fuel/1 \
 curl -i -X DELETE http://127.0.0.1:3000/api/cars/1/fuel/1
 ```
 
+`GET /api/health` runs `SELECT 1` against PostgreSQL with a 2-second limit. It
+returns `200 {"status":"ok"}` when the database answers and
+`503 {"status":"unavailable"}` when it does not. The backend keeps running
+while the database is down and reconnects once it is back.
+
 A car is `{ "id": 1, "name": "Octavia", "createdAt": "2026-09-17T08:00:00.000Z" }`.
 Car names are trimmed, must be 1 to 60 characters, and are unique ignoring
 ASCII case. `GET /api/cars` returns `200` with all cars sorted by name
@@ -122,7 +164,8 @@ Cars cannot be deleted. A duplicate name returns `409` with the error code
 (field `carId`), and an invalid name returns `400 VALIDATION_ERROR` (field
 `name`).
 
-Record request and response bodies are unchanged and do not contain a car ID.
+Record request and response bodies do not contain a car ID; the car comes from
+the URL.
 Successful record creates return `201`, lists and updates return `200`, and
 successful deletes return `204` with an empty body. Records are only visible
 through their own car's URLs. A `carId` or record `id` that is not a positive
@@ -136,9 +179,6 @@ Body checks apply to every `POST` and `PUT` under `/api/cars` before the
 `415 UNSUPPORTED_MEDIA_TYPE`, a body over 16 KB returns `413`, and malformed
 JSON returns `400`. So a request with a bad body and a bad `carId` reports the
 body problem.
-
-Press `Ctrl+C` to close the HTTP server and SQLite connection. Remove the
-disposable database and its `-wal`/`-shm` files after testing.
 
 ## Quality checks
 
@@ -163,6 +203,20 @@ npm run test:coverage
 npm run build
 ```
 
+Backend tests need neither Docker nor the development database: each test file
+starts its own throwaway PostgreSQL 17 through `embedded-postgres`. PostgreSQL
+refuses to run as root, so run the tests as a regular user.
+
+## Compose files
+
+All live in `deploy/`:
+
+- `compose.dev.yml`: PostgreSQL only, for `npm run dev` (see above).
+- `compose.local.yml`: the whole application built from this checkout, for a
+  local production-like test (see [Local production-stack test](#local-production-stack-test)).
+- `compose.example.yml`: the home-server template (see
+  [Home-server Compose setup](#home-server-compose-setup)).
+
 ## Production containers
 
 The production images target `linux/amd64`, matching the home server. They are
@@ -174,40 +228,39 @@ docker build -f backend/Dockerfile -t car-tracker-backend:test .
 docker build -f frontend/Dockerfile -t car-tracker-frontend:test .
 ```
 
-The backend image contains compiled JavaScript and production dependencies
-only, runs as the built-in numeric `node` user (UID/GID `1000`), and persists
-SQLite data at `/data/car.sqlite`. The frontend image is static Nginx content.
+The backend image contains compiled JavaScript and production dependencies,
+and the Drizzle migrations; it runs as the built-in numeric `node` user (UID/GID
+`1000`) and stores data in PostgreSQL. It has two entry points: `dist/index.js`
+(the server, default) and `dist/migrate.js` (applies pending migrations and
+exits). The frontend image is static Nginx content.
 
 ### Home-server Compose setup
 
 Do this in a new deployment directory, outside the Git checkout if preferred:
 
 ```bash
-mkdir -p car-tracker-deploy/data
+mkdir -p car-tracker-deploy
 cp deploy/compose.example.yml car-tracker-deploy/compose.yml
 cp deploy/.env.example car-tracker-deploy/.env
 docker network create reverse-proxy
 ```
 
-Replace `OWNER` in `compose.yml` with the lowercase GitHub owner. Set
-`APP_VERSION` in `.env` to an immutable `sha-<full commit SHA>` image tag after
-publication. The `reverse-proxy` network is external: attach the existing TLS
-reverse-proxy container to it separately. Neither application service publishes
-a host port.
+Replace `OWNER` in `compose.yml` with the lowercase GitHub owner. Fill in
+the `DB_*` values in `.env`, and set `APP_VERSION` to an immutable
+`sha-<full commit SHA>` image tag after publication.
 
-The bind mount must be writable by the backend's runtime user and must not be
-world-writable:
+Both networks are external. Attach the existing TLS reverse-proxy container to
+`reverse-proxy` separately. `database` is the network of the shared PostgreSQL
+service, which already holds the `car_tracker` database and role (see the
+[Shared Postgres README](https://github.com/bercee/docker-services/blob/main/postgres/README.md));
+the `migrate` and `backend` services join it. No service publishes a host
+port.
 
-```bash
-chown 1000:1000 car-tracker-deploy/data
-chmod 750 car-tracker-deploy/data
-```
-
-Confirm the UID/GID before setup with:
-
-```bash
-docker run --rm --entrypoint id car-tracker-backend:test
-```
+On `docker compose up`, the one-shot `migrate` service applies pending
+migrations first; the `backend` starts only after it exits successfully. A
+failing migration leaves `backend` uncreated and `migrate` exited non-zero, so
+check `docker compose logs migrate`. Migrations are not applied by the backend
+itself.
 
 From the deployment directory, validate the generated configuration and start
 the containers:
@@ -227,28 +280,13 @@ approved reload. The `/api/` `proxy_pass` has no URI suffix, preserving request
 paths such as `/api/cars`.
 
 For local teardown of this example deployment, run `docker compose down` from
-the deployment directory. This removes containers but retains `./data` and its
-SQLite database. Remove that directory manually only when the data is no longer
-needed.
-
-### Upgrading an existing deployment
-
-The multi-car release changes the database schema without a migration, and the
-backend refuses to start on an old database. Follow the release checklist below
-through the image pull and the backup step (see Backup, rollback, and
-troubleshooting), so the old records are saved first. Then run
-`docker compose down` in the deployment directory and delete
-`./data/car.sqlite` together with `./data/car.sqlite-wal` and
-`./data/car.sqlite-shm` (they are `/data/car.sqlite`, `/data/car.sqlite-wal`,
-and `/data/car.sqlite-shm` inside the container). Continue with the remaining
-checklist steps; the backend creates a fresh database on start. For the local
-production-stack test, run `docker compose -f deploy/compose.local.yml down -v`
-to drop its volume. The proxy's `/api/` rule needs no change.
+the deployment directory. This removes containers; the data stays in PostgreSQL.
 
 ### Local production-stack test
 
-`deploy/compose.local.yml` builds both application images from this checkout
-and runs a local HTTP-only Nginx proxy. It does not use GHCR, your external
+`deploy/compose.local.yml` builds both application images from this checkout,
+starts a throwaway PostgreSQL 17 container, runs the `migrate` step, and runs a
+local HTTP-only Nginx proxy. It does not use GHCR, your external
 proxy network, TLS, or Basic Auth. Only the proxy binds a host port, and it is
 limited to `127.0.0.1:8080`.
 
@@ -317,11 +355,13 @@ docker login ghcr.io
    docker pull ghcr.io/OWNER/car-tracker-backend:sha-<full-commit-sha>
    ```
 
-4. Back up the SQLite database before any schema-changing release.
+4. Back up the database before any schema-changing release (see
+   [Backup and restore](#backup-and-restore)).
 5. Set `APP_VERSION=sha-<full-commit-sha>` in the deployment directory's
    private `.env`; never use the mutable `main` tag for a release.
 6. Run `docker compose pull && docker compose up -d`, then inspect
-   `docker compose ps` and `docker compose logs backend`.
+   `docker compose ps`, `docker compose logs migrate` and
+   `docker compose logs backend`.
 7. Open the authenticated application. Do not create synthetic production rows
    just to test the deployment.
 
@@ -337,35 +377,43 @@ gh workflow run ci.yml --ref v1.0.0
 After its workflow completes, verify that the semantic tags and that commit's
 `sha-<full-commit-sha>` tag resolve to the same image digest for each package.
 
-### Backup, rollback, and troubleshooting
+### Backup and restore
 
-Run SQLite's online backup command on the server; do not copy only a live main
-database file while WAL writes may be active:
+Backups are manual until automation is designed (see
+[ADR 0001](docs/adr/0001-shared-postgres-service.md)). Run this on the home
+server before any schema-changing release, replacing `<postgres-container>` with the shared PostgreSQL container's name.
+It writes a compressed dump of only the `car_tracker` database:
 
 ```bash
-mkdir -p backups
-sqlite3 ./data/car.sqlite ".backup './backups/car-$(date +%F-%H%M%S).sqlite'"
+docker exec <postgres-container> pg_dump -U car_tracker -d car_tracker -Fc > car-tracker-$(date +%F).dump
 ```
 
-To roll back, restore the prior immutable SHA in `.env`, then run:
+Keep the dump off the server too, and check it is readable with
+`pg_restore --list car-tracker-<date>.dump`. To restore, stop the backend, then
+replace the database contents from the dump:
+
+```bash
+docker compose stop backend
+docker exec -i <postgres-container> pg_restore -U car_tracker -d car_tracker --clean --if-exists --no-owner < car-tracker-<date>.dump
+docker compose up -d
+```
+
+### Rollback and troubleshooting
+
+To roll back a release, restore the prior SHA in `.env` and run the command
+below. Migrations are not reverted automatically; if the release changed the
+schema, restore its pre-release dump first.
 
 ```bash
 docker compose pull && docker compose up -d
 ```
 
-Schema initialization is idempotent, so an ordinary image rollback between
-multi-car releases does not require restoring the database. Rolling back from
-the multi-car release to a single-car image requires restoring the pre-upgrade
-backup, and loses every record entered since the upgrade. Restore a backup
-whenever a rollback crosses an incompatible schema change, such as this
-release, and test restoration periodically.
-
 If pulls fail, confirm the registry login uses a package-read credential and
 that package visibility/linkage permits the account access. If a container does
-not start, check `docker compose ps`, then `docker compose logs backend` or
-`docker compose logs frontend`; confirm `APP_VERSION` exists for both images
-and that `./data` is owned by the backend runtime UID/GID. If the proxy returns
+not start, check `docker compose ps`, then `docker compose logs migrate`,
+`docker compose logs backend` or `docker compose logs frontend`; confirm `APP_VERSION` exists for both images
+and that the `DB_*` settings reach the PostgreSQL server. If the proxy returns
 an error, validate its configuration with `nginx -t`, confirm all containers are
 on `reverse-proxy`, and check that its `/api/` upstream preserves the `/api`
-prefix. CI never accesses the home server, SSH, Basic Auth material, or SQLite
+prefix. CI never accesses the home server, SSH, Basic Auth material, or database
 data.

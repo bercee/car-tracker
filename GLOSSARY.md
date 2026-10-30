@@ -5,7 +5,7 @@ A personal tool for logging what a person's cars consume and cost: fuel, AdBlue 
 ## Language
 
 **Car**:
-A vehicle whose records are tracked. Provisional: its exact shape is owned by the separate multi-car work.
+A distinct tracked automobile to which Records belong. A person may track several Cars.
 _Avoid_: Vehicle
 
 **Record**:
