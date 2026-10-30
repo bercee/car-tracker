@@ -180,8 +180,8 @@ describe('App', () => {
     let resolve: (() => void) | undefined;
     api.addFuel.mockImplementation(
       () =>
-        new Promise<void>((done) => {
-          resolve = done;
+        new Promise<unknown>((done) => {
+          resolve = () => done({ id: 1 });
         }),
     );
     const user = userEvent.setup();
@@ -663,6 +663,27 @@ describe('App', () => {
       expect(await panel('Fuel').findByRole('button', { name: redoName })).toBeInTheDocument();
     });
 
+    it('records the edit even when the edited record has left the list before the save', async () => {
+      defaults();
+      api.getFuel.mockResolvedValue([fuelRow(8, 'Original'), fuelRow(9, 'Other')]);
+      const user = userEvent.setup();
+      render(<App />);
+      await user.click(await screen.findByRole('button', { name: 'Edit Fuel record 8' }));
+      api.getFuel.mockResolvedValue([]);
+      await user.click(screen.getByRole('button', { name: 'Delete Fuel record 9' }));
+      await panel('Fuel').findByText('Fuel record deleted.');
+      await panel('Fuel').findByText('No records yet.');
+
+      await user.clear(screen.getByLabelText('Remark'));
+      await user.type(screen.getByLabelText('Remark'), 'Edited');
+      await user.click(screen.getByRole('button', { name: 'Update record' }));
+      await panel('Fuel').findByText('Fuel record updated.');
+      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
+      await waitFor(() =>
+        expect(api.updateFuel).toHaveBeenLastCalledWith(1, 8, expect.objectContaining({ remark: 'Original' })),
+      );
+    });
+
     it('keeps the history across car and section switches', async () => {
       defaults();
       api.getFuel.mockResolvedValue([fuelRow(8, 'Original')]);
@@ -757,6 +778,34 @@ describe('App', () => {
       });
       expect(screen.queryByText('Undid edit of Fuel record.')).not.toBeInTheDocument();
       expect(api.getFuel).toHaveBeenCalledTimes(fuelCalls);
+    });
+
+    it('keeps Undo disabled on a remounted Panel until an undo started before a car switch lands', async () => {
+      defaults();
+      api.getFuel.mockImplementation((id: number) => Promise.resolve(id === 1 ? [fuelRow(8, 'Original')] : []));
+      const user = userEvent.setup();
+      render(<App />);
+      await editRemark(user, 8, 'Edited');
+      const pendingUndo = deferred<unknown>();
+      api.updateFuel.mockReturnValue(pendingUndo.promise);
+      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
+      await waitFor(() => expect(api.updateFuel).toHaveBeenCalledTimes(2));
+      await user.selectOptions(screen.getByLabelText('Car'), 'Polo');
+      await screen.findByText('No records yet.');
+      await user.selectOptions(screen.getByLabelText('Car'), 'Golf');
+      await screen.findByRole('button', { name: 'Edit Fuel record 8' });
+
+      expect(panel('Fuel').getByRole('button', { name: undoName })).toBeDisabled();
+      await user.click(document.body);
+      await user.keyboard('{Control>}z{/Control}');
+      expect(api.updateFuel).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        pendingUndo.resolve({});
+        await pendingUndo.promise;
+      });
+      expect(panel('Fuel').getByRole('button', { name: 'Undo' })).toBeDisabled();
+      expect(panel('Fuel').getByRole('button', { name: redoName })).toBeEnabled();
     });
 
     it('cancels the edit form when the loaded record is undone, but not another record', async () => {
@@ -1123,6 +1172,18 @@ describe('App', () => {
 
       await user.click(screen.getByLabelText('Remark'));
       await user.keyboard(undoShortcut);
+      expect(api.updateFuel).not.toHaveBeenCalled();
+    });
+
+    it('responds only to Ctrl, not to the Meta key', async () => {
+      defaults();
+      api.getFuel.mockResolvedValue([fuelRow(8, 'Original')]);
+      const user = userEvent.setup();
+      render(<App />);
+      await editRemark(user, 'Edited');
+      api.updateFuel.mockClear();
+
+      await user.keyboard('{Meta>}z{/Meta}');
       expect(api.updateFuel).not.toHaveBeenCalled();
     });
 

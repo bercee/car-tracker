@@ -14,10 +14,24 @@ export interface UndoEntry {
 export class UndoHistory {
   private done: UndoEntry[] = [];
   private undone: UndoEntry[] = [];
+  private listeners = new Set<() => void>();
+  private version = 0;
+  /** True while a change to this history's Records is in flight; undo and redo do nothing meanwhile. */
+  pending = false;
+
+  // Arrow functions, so React's useSyncExternalStore can take them unbound.
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener);
+    return () => void this.listeners.delete(listener);
+  };
+
+  /** Changes whenever anything the history reports changes. */
+  snapshot = () => this.version;
 
   record(entry: UndoEntry) {
     this.done.push(entry);
-    this.undone = [];
+    this.undone.length = 0;
+    this.notify();
   }
 
   undoDescription() {
@@ -28,35 +42,57 @@ export class UndoHistory {
     return this.undone.at(-1)?.description;
   }
 
-  // Resolves to the entry that was applied, or undefined when there is nothing to do.
+  /** Runs a change with the history marked pending, so no undo or redo races it, even across Panel remounts. */
+  async run<T>(change: () => Promise<T>) {
+    this.setPending(true);
+    try {
+      return await change();
+    } finally {
+      this.setPending(false);
+    }
+  }
+
+  // Resolves to the entry that was applied, or undefined when there is nothing to do or a change is pending.
   // A failing effect rejects. The entry stays where it was (so the user can retry) unless
   // `shouldDiscard` says the failure is final, in which case only that entry is dropped.
-  async undo(shouldDiscard: (cause: unknown) => boolean = () => false) {
-    const entry = this.done.at(-1);
-    if (!entry) return undefined;
-    try {
-      this.remap(entry.recordId, await entry.reverse(entry.recordId));
-    } catch (cause) {
-      if (shouldDiscard(cause)) this.done.pop();
-      throw cause;
-    }
-    this.done.pop();
-    this.undone.push(entry);
+  undo(shouldDiscard: (cause: unknown) => boolean = () => false) {
+    return this.step(this.done, this.undone, 'reverse', shouldDiscard);
+  }
+
+  redo(shouldDiscard: (cause: unknown) => boolean = () => false) {
+    return this.step(this.undone, this.done, 'reapply', shouldDiscard);
+  }
+
+  // Applies the newest entry of `from` and moves it onto `to`.
+  private async step(
+    from: UndoEntry[],
+    to: UndoEntry[],
+    effect: 'reverse' | 'reapply',
+    shouldDiscard: (cause: unknown) => boolean,
+  ) {
+    const entry = from.at(-1);
+    if (!entry || this.pending) return undefined;
+    await this.run(async () => {
+      try {
+        this.remap(entry.recordId, await entry[effect](entry.recordId));
+      } catch (cause) {
+        if (shouldDiscard(cause)) from.pop();
+        throw cause;
+      }
+      from.pop();
+      to.push(entry);
+    });
     return entry;
   }
 
-  async redo(shouldDiscard: (cause: unknown) => boolean = () => false) {
-    const entry = this.undone.at(-1);
-    if (!entry) return undefined;
-    try {
-      this.remap(entry.recordId, await entry.reapply(entry.recordId));
-    } catch (cause) {
-      if (shouldDiscard(cause)) this.undone.pop();
-      throw cause;
-    }
-    this.undone.pop();
-    this.done.push(entry);
-    return entry;
+  private setPending(pending: boolean) {
+    this.pending = pending;
+    this.notify();
+  }
+
+  private notify() {
+    this.version++;
+    for (const listener of this.listeners) listener();
   }
 
   private remap(oldId: number, created: void | number) {

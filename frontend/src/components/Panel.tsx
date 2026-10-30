@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react';
 
 import { ApiError } from '../api';
 import { useIsMounted } from '../useIsMounted';
@@ -48,11 +48,15 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
   const [value, setValue] = useState(initial);
   const [records, setRecords] = useState<R[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pending, setPending] = useState(false);
-  const [editingId, setEditingId] = useState<number>();
+  // The Record being edited, with its values as loaded into the form, so the edit can be undone.
+  const [editing, setEditing] = useState<{ id: number; before: T }>();
+  const editingId = editing?.id;
   const [message, setMessage] = useState<string>();
   const [error, setError] = useState<string>();
   const isMounted = useIsMounted();
+  // The history outlives this Panel, so a change started before a remount still disables the controls here.
+  useSyncExternalStore(history.subscribe, history.snapshot);
+  const pending = history.pending;
   const refresh = async () => {
     setLoading(true);
     try {
@@ -82,13 +86,14 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
   }, [load]);
 
   const onEdit = (record: R) => {
-    setEditingId(record.id);
-    setValue(toFormValue(record));
+    const before = toFormValue(record);
+    setEditing({ id: record.id, before });
+    setValue(before);
     setError(undefined);
     setMessage(undefined);
   };
   const cancelEdit = () => {
-    setEditingId(undefined);
+    setEditing(undefined);
     setValue(initial());
     setError(undefined);
     setMessage(undefined);
@@ -100,51 +105,44 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
       setError(invalid);
       return;
     }
-    const wasEditing = editingId !== undefined;
-    const previous = wasEditing ? records.find((record) => record.id === editingId) : undefined;
-    setPending(true);
+    const wasEditing = editing !== undefined;
     setError(undefined);
     setMessage(undefined);
     try {
-      let created: R | undefined;
-      if (wasEditing) await update(editingId!, value);
-      else created = await submit(value);
-      if (created) {
-        const after = value;
-        history.record({
-          recordId: created.id,
-          description: `add of ${title} record from ${after.eventDate}`,
-          reverse: async (id) => remove(id),
-          reapply: async () => (await submit(after)).id,
-        });
-      }
-      if (previous) {
-        const id = previous.id;
-        const before = toFormValue(previous);
-        const after = value;
-        history.record({
-          recordId: id,
-          description: `edit of ${title} record from ${before.eventDate}`,
-          reverse: async (current) => void (await update(current, before)),
-          reapply: async (current) => void (await update(current, after)),
-        });
-      }
+      const after = value;
+      await history.run(async () => {
+        if (editing) {
+          const { id, before } = editing;
+          await update(id, after);
+          history.record({
+            recordId: id,
+            description: `edit of ${title} record from ${before.eventDate}`,
+            reverse: async (current) => void (await update(current, before)),
+            reapply: async (current) => void (await update(current, after)),
+          });
+        } else {
+          const created = await submit(after);
+          history.record({
+            recordId: created.id,
+            description: `add of ${title} record from ${after.eventDate}`,
+            reverse: async (id) => remove(id),
+            reapply: async () => (await submit(after)).id,
+          });
+        }
+      });
       if (!isMounted()) return;
       setValue(initial());
-      setEditingId(undefined);
+      setEditing(undefined);
       setMessage(`${title} record ${wasEditing ? 'updated' : 'saved'}.`);
       await refresh();
     } catch (cause) {
       if (isMounted()) {
         setError(cause instanceof ApiError ? cause.message : `Unable to ${wasEditing ? 'update' : 'save'} the record.`);
       }
-    } finally {
-      if (isMounted()) setPending(false);
     }
   };
   const applyUndoRedo = async (verb: 'Undo' | 'Redo') => {
     const what = (verb === 'Undo' ? history.undoDescription() : history.redoDescription())?.replace(/ from .*$/, '');
-    setPending(true);
     setError(undefined);
     setMessage(undefined);
     try {
@@ -153,7 +151,7 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
       const entry = await (verb === 'Undo' ? history.undo(discard) : history.redo(discard));
       if (!isMounted() || !entry) return;
       if (editingId === entry.recordId) {
-        setEditingId(undefined);
+        setEditing(undefined);
         setValue(initial());
       }
       setMessage(`${verb === 'Undo' ? 'Undid' : 'Redid'} ${entry.description.replace(/ from .*$/, '')}.`);
@@ -164,13 +162,11 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
           cause instanceof ApiError ? cause.message : `Unable to ${verb.toLowerCase()} ${what ?? 'the action'}.`,
         );
       }
-    } finally {
-      if (isMounted()) setPending(false);
     }
   };
   const handleShortcut = (verb: 'Undo' | 'Redo') => {
     const description = verb === 'Undo' ? history.undoDescription() : history.redoDescription();
-    if (pending || description === undefined) return false;
+    if (history.pending || description === undefined) return false;
     void applyUndoRedo(verb);
     return true;
   };
@@ -178,7 +174,7 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
   useEffect(() => {
     if (!visible) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      if (!event.ctrlKey || event.altKey) return;
       const key = event.key.toLowerCase();
       const verb =
         key === 'z' && !event.shiftKey ? 'Undo' : key === 'y' || (key === 'z' && event.shiftKey) ? 'Redo' : undefined;
@@ -189,29 +185,28 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
     return () => document.removeEventListener('keydown', onKeyDown);
   });
   const onDelete = async (record: R) => {
-    setPending(true);
     setError(undefined);
     setMessage(undefined);
     try {
-      await remove(record.id);
-      const before = toFormValue(record);
-      history.record({
-        recordId: record.id,
-        description: `delete of ${title} record from ${before.eventDate}`,
-        reverse: async () => (await submit(before)).id,
-        reapply: async (id) => remove(id),
+      await history.run(async () => {
+        await remove(record.id);
+        const before = toFormValue(record);
+        history.record({
+          recordId: record.id,
+          description: `delete of ${title} record from ${before.eventDate}`,
+          reverse: async () => (await submit(before)).id,
+          reapply: async (id) => remove(id),
+        });
       });
       if (!isMounted()) return;
       if (editingId === record.id) {
-        setEditingId(undefined);
+        setEditing(undefined);
         setValue(initial());
       }
       setMessage(`${title} record deleted.`);
       await refresh();
     } catch (cause) {
       if (isMounted()) setError(cause instanceof ApiError ? cause.message : 'Unable to delete the record.');
-    } finally {
-      if (isMounted()) setPending(false);
     }
   };
 

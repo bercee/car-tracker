@@ -81,6 +81,34 @@ describe('undo history', () => {
     expect(history.undoDescription()).toBe('third');
   });
 
+  it('is pending while an undo runs, ignores a second one meanwhile and tells subscribers', async () => {
+    const history = new UndoHistory();
+    let finish!: () => void;
+    const reverse = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    history.record({ ...entry(1, 'first'), reverse });
+    const listener = vi.fn();
+    const unsubscribe = history.subscribe(listener);
+
+    const first = history.undo();
+    expect(history.pending).toBe(true);
+    expect(listener).toHaveBeenCalled();
+    expect(await history.undo()).toBeUndefined();
+    expect(await history.redo()).toBeUndefined();
+    expect(reverse).toHaveBeenCalledTimes(1);
+
+    listener.mockClear();
+    finish();
+    expect((await first)?.recordId).toBe(1);
+    expect(history.pending).toBe(false);
+    expect(history.redoDescription()).toBe('first');
+    expect(listener).toHaveBeenCalled();
+
+    unsubscribe();
+    listener.mockClear();
+    history.record(entry(2, 'second'));
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it('keeps an entry where it was when its effect fails', async () => {
     const history = new UndoHistory();
     const failing = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValue(undefined);
