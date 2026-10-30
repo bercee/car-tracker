@@ -572,6 +572,29 @@ describe('App', () => {
     expect(await screen.findByText('Enter a car name.')).toBeInTheDocument();
     expect(api.addCar).not.toHaveBeenCalled();
   });
+  it('sends the trimmed name when adding a car', async () => {
+    defaults();
+    api.addCar.mockResolvedValue({ id: 3, name: 'Astra', createdAt: '' });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'Cars' }));
+    await user.type(screen.getByLabelText('Name'), '  Astra  ');
+    await user.click(screen.getByRole('button', { name: 'Add car' }));
+    expect(api.addCar).toHaveBeenCalledWith({ name: 'Astra' });
+  });
+  it('rejects a whitespace-only rename without a request', async () => {
+    defaults();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'Cars' }));
+    await user.clear(screen.getByLabelText('New name'));
+    await user.type(screen.getByLabelText('New name'), '   ');
+    await user.click(screen.getByRole('button', { name: 'Rename car' }));
+    expect(await screen.findByText('Enter a car name.')).toBeInTheDocument();
+    expect(api.renameCar).not.toHaveBeenCalled();
+  });
   it('renames the active car without reloading its records', async () => {
     defaults();
     api.renameCar.mockResolvedValue({ id: 1, name: 'Beetle', createdAt: '' });

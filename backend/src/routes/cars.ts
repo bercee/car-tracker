@@ -1,9 +1,9 @@
+import { carRequestSchema } from '@car-tracker/contracts';
 import { Router } from 'express';
 
 import type { CarDatabase } from '../database/carDatabase.js';
 import { DuplicateCarNameError } from '../database/errors.js';
 import { HttpError } from '../errors.js';
-import { validateCarRequest } from '../validation/car.js';
 import { carParams } from './params.js';
 
 export function createCarsRouter(database: CarDatabase): Router {
@@ -14,13 +14,13 @@ export function createCarsRouter(database: CarDatabase): Router {
   });
 
   router.post('/', async (request, response) => {
-    const input = validateCarRequest(request.body);
+    const input = carRequestSchema.parse(request.body);
     response.status(201).json(await withDuplicateNameConflict(() => database.addCar(input)));
   });
 
   router.put('/:carId', async (request, response) => {
     const { carId: id } = carParams.parse(request.params);
-    const input = validateCarRequest(request.body);
+    const input = carRequestSchema.parse(request.body);
     const car = await withDuplicateNameConflict(() => database.renameCar(id, input));
     if (!car) throw new HttpError(404, 'NOT_FOUND', 'Car not found', 'carId');
     response.status(200).json(car);

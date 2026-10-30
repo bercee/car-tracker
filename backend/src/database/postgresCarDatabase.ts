@@ -5,7 +5,7 @@ import type {
   AdBlueInput,
   AdBlueRecord,
   Car,
-  CarInput,
+  CarRequest,
   ExpenseRecord,
   ExpenseRequest,
   FuelInput,
@@ -38,7 +38,7 @@ export class PostgresCarDatabase implements CarDatabase {
     return row && mapCarRow(row);
   }
 
-  async addCar(input: CarInput): Promise<Car> {
+  async addCar(input: CarRequest): Promise<Car> {
     try {
       const [row] = await this.#db.insert(cars).values(input).returning();
       return mapCarRow(row!);
@@ -47,7 +47,7 @@ export class PostgresCarDatabase implements CarDatabase {
     }
   }
 
-  async renameCar(id: number, input: CarInput): Promise<Car | undefined> {
+  async renameCar(id: number, input: CarRequest): Promise<Car | undefined> {
     try {
       const [row] = await this.#db.update(cars).set(input).where(eq(cars.id, id)).returning();
       return row && mapCarRow(row);
