@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { boolean, check, date, index, integer, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 const id = () => integer().primaryKey().generatedAlwaysAsIdentity();
-const createdAt = () => timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow();
+const createdAt = () => timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow();
 const eventDate = () => date('event_date', { mode: 'string' }).notNull();
 
 export const cars = pgTable(

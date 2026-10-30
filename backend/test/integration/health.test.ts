@@ -4,30 +4,26 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { createPostgresConnection } from '../../src/postgres.js';
 import type { PostgresConnection } from '../../src/postgres.js';
-import type { TestDatabase } from '../helpers/testDb.js';
-import { createTestDatabase } from '../helpers/testDb.js';
+import { PostgresCarDatabase } from '../../src/database/postgresCarDatabase.js';
 import type { TestPostgres } from '../helpers/testPostgres.js';
 import { startTestPostgres } from '../helpers/testPostgres.js';
 
 describe('GET /api/health against PostgreSQL', () => {
   let postgres: TestPostgres;
   let connection: PostgresConnection;
-  let sqlite: TestDatabase;
 
   beforeAll(async () => {
     postgres = await startTestPostgres();
     connection = createPostgresConnection(postgres.config, { healthTimeoutMs: 1_000 });
-    sqlite = createTestDatabase();
   }, 60_000);
 
   afterAll(async () => {
     await connection.close();
     await postgres.stop();
-    sqlite.closeAndRemove();
   });
 
   it('passes while the database is up and fails once it is stopped', async () => {
-    const app = createApp(sqlite.database, { error: () => undefined }, connection.checkHealth);
+    const app = createApp(new PostgresCarDatabase(connection.db), { error: () => undefined }, connection.checkHealth);
 
     const up = await request(app).get('/api/health');
     expect(up.status).toBe(200);
