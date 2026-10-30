@@ -315,14 +315,17 @@ docker compose -f deploy/compose.local.yml down -v
 
 ## CI, GHCR, and releases
 
-GitHub Actions runs formatting, linting, strict type checking, coverage tests,
-application builds, and non-publishing `linux/amd64` Docker builds for every
-pull request and eligible push. Docker publication is manual: use **Run
-workflow** in GitHub Actions to publish a branch, or GitHub CLI/API with a tag
-ref to publish a version tag. Pull requests and ordinary pushes never log in to
-GHCR or publish an image. A manual run on `main` publishes `main` and immutable
-`sha-<full commit SHA>` tags; a manual run on a `v*` tag also publishes the
-matching version and major/minor version tags.
+Two GitHub Actions workflows live in `.github/workflows/`:
+
+- `pr.yml` runs on every pull request: formatting, linting, strict type
+  checking, coverage tests, application builds, and non-publishing
+  `linux/amd64` Docker builds. It never logs in to GHCR.
+- `release.yml` is manual (**Run workflow**, or `gh workflow run release.yml
+-f version=0.2.0`) and only runs on `main`. It re-runs the same checks, then
+  publishes both images to GHCR as `X.Y.Z`, `X.Y`, `sha-<full commit SHA>` and
+  `latest`, and finally creates the `v<version>` git tag and a GitHub Release
+  with generated notes. It fails early if the version is not `X.Y.Z` or the tag
+  already exists.
 
 Before the first publication, ensure GitHub Packages is enabled for the
 repository. The workflow labels each image with its source repository; verify
@@ -344,10 +347,10 @@ docker login ghcr.io
 
 1. Open a pull request and confirm `verify` and both `images` matrix builds
    pass. Those builds must report `push: false`.
-2. Review and merge the pull request. In GitHub Actions, choose **Run
-   workflow**, select `main`, and confirm both `publish-images` matrix entries
-   publish `car-tracker-frontend` and `car-tracker-backend` with the same
-   full-SHA tag.
+2. Review and merge the pull request. In GitHub Actions, choose **Release >
+   Run workflow**, select `main`, and enter the version. Confirm both
+   `publish-images` matrix entries publish `car-tracker-frontend` and
+   `car-tracker-backend` with the same full-SHA tag.
 3. On the home server, pull both exact tags before changing containers:
 
    ```bash
@@ -358,23 +361,15 @@ docker login ghcr.io
 4. Back up the database before any schema-changing release (see
    [Backup and restore](#backup-and-restore)).
 5. Set `APP_VERSION=sha-<full-commit-sha>` in the deployment directory's
-   private `.env`; never use the mutable `main` tag for a release.
+   private `.env`; prefer the immutable `sha-` tag or an `X.Y.Z` tag over the
+   mutable `latest`.
 6. Run `docker compose pull && docker compose up -d`, then inspect
    `docker compose ps`, `docker compose logs migrate` and
    `docker compose logs backend`.
 7. Open the authenticated application. Do not create synthetic production rows
    just to test the deployment.
 
-For a versioned release, push an annotated tag after the commit is on `main`,
-then manually dispatch the workflow against that tag with GitHub CLI:
-
-```bash
-git tag -a v1.0.0 -m 'v1.0.0'
-git push origin v1.0.0
-gh workflow run ci.yml --ref v1.0.0
-```
-
-After its workflow completes, verify that the semantic tags and that commit's
+After the workflow completes, verify that the version tags and that commit's
 `sha-<full-commit-sha>` tag resolve to the same image digest for each package.
 
 ### Backup and restore
