@@ -29,20 +29,31 @@ export class UndoHistory {
   }
 
   // Resolves to the entry that was applied, or undefined when there is nothing to do.
-  // A failing effect rejects and leaves the entry where it was.
-  async undo() {
+  // A failing effect rejects. The entry stays where it was (so the user can retry) unless
+  // `shouldDiscard` says the failure is final, in which case only that entry is dropped.
+  async undo(shouldDiscard: (cause: unknown) => boolean = () => false) {
     const entry = this.done.at(-1);
     if (!entry) return undefined;
-    this.remap(entry.recordId, await entry.reverse(entry.recordId));
+    try {
+      this.remap(entry.recordId, await entry.reverse(entry.recordId));
+    } catch (cause) {
+      if (shouldDiscard(cause)) this.done.pop();
+      throw cause;
+    }
     this.done.pop();
     this.undone.push(entry);
     return entry;
   }
 
-  async redo() {
+  async redo(shouldDiscard: (cause: unknown) => boolean = () => false) {
     const entry = this.undone.at(-1);
     if (!entry) return undefined;
-    this.remap(entry.recordId, await entry.reapply(entry.recordId));
+    try {
+      this.remap(entry.recordId, await entry.reapply(entry.recordId));
+    } catch (cause) {
+      if (shouldDiscard(cause)) this.undone.pop();
+      throw cause;
+    }
     this.undone.pop();
     this.done.push(entry);
     return entry;

@@ -3,7 +3,15 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => {
-  class ApiError extends Error {}
+  class ApiError extends Error {
+    constructor(
+      message: string,
+      readonly field?: string,
+      readonly kind: 'network' | 'not-found' | 'rejected' = 'rejected',
+    ) {
+      super(message);
+    }
+  }
 
   return {
     ApiError,
@@ -918,6 +926,109 @@ describe('App', () => {
       await user.click(panel('Fuel').getByRole('button', { name: redoDelete }));
       await panel('Fuel').findByText('Redid delete of Fuel record.');
       expect(panel('Fuel').getByRole('group')).toHaveTextContent('Add fuel record');
+    });
+  });
+
+  describe('undo and redo failure policy', () => {
+    const undoName = 'Undo edit of Fuel record from 2026-09-18';
+    const redoName = 'Redo edit of Fuel record from 2026-09-18';
+    const editRemark = async (user: ReturnType<typeof userEvent.setup>, remark: string) => {
+      await user.click(await screen.findByRole('button', { name: 'Edit Fuel record 8' }));
+      await user.clear(screen.getByLabelText('Remark'));
+      await user.type(screen.getByLabelText('Remark'), remark);
+      await user.click(screen.getByRole('button', { name: 'Update record' }));
+      await panel('Fuel').findByText('Fuel record updated.');
+    };
+    // Two edits, so there is an older action under the newest one.
+    const twoEdits = async (user: ReturnType<typeof userEvent.setup>) => {
+      api.getFuel.mockResolvedValue([fuelRow(8, 'Original')]);
+      render(<App />);
+      await editRemark(user, 'First');
+      await editRemark(user, 'Second');
+    };
+
+    it('keeps the entry after a network failure and applies it on retry', async () => {
+      defaults();
+      const user = userEvent.setup();
+      await twoEdits(user);
+      api.updateFuel.mockRejectedValueOnce(new api.ApiError('Unable to reach the server.', undefined, 'network'));
+      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
+      expect(await panel('Fuel').findByRole('alert')).toHaveTextContent('Unable to reach the server.');
+      expect(panel('Fuel').getByRole('button', { name: undoName })).toBeEnabled();
+
+      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
+      await waitFor(() =>
+        expect(api.updateFuel).toHaveBeenLastCalledWith(1, 8, expect.objectContaining({ remark: 'Original' })),
+      );
+      expect(await panel('Fuel').findByRole('status')).toHaveTextContent('Undid edit of Fuel record.');
+    });
+
+    it.each([
+      ['not found', 'not-found'],
+      ['rejected', 'rejected'],
+    ] as const)('drops the entry after an undo fails as %s', async (_label, kind) => {
+      defaults();
+      const user = userEvent.setup();
+      await twoEdits(user);
+      api.updateFuel.mockRejectedValueOnce(new api.ApiError('Record no longer exists.', undefined, kind));
+      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
+      expect(await panel('Fuel').findByRole('alert')).toHaveTextContent('Record no longer exists.');
+      expect(panel('Fuel').getByRole('button', { name: 'Redo' })).toBeDisabled();
+
+      // The next older action is now offered: undoing it writes the original values back.
+      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
+      await waitFor(() =>
+        expect(api.updateFuel).toHaveBeenLastCalledWith(1, 8, expect.objectContaining({ remark: 'Original' })),
+      );
+      await panel('Fuel').findByText('Undid edit of Fuel record.');
+      expect(panel('Fuel').getByRole('button', { name: 'Undo' })).toBeDisabled();
+    });
+
+    it('disables Undo after dropping the only entry', async () => {
+      defaults();
+      api.getFuel.mockResolvedValue([fuelRow(8, 'Original')]);
+      const user = userEvent.setup();
+      render(<App />);
+      await editRemark(user, 'First');
+      api.updateFuel.mockRejectedValueOnce(new api.ApiError('Gone.', undefined, 'not-found'));
+      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
+      expect(await panel('Fuel').findByRole('alert')).toHaveTextContent('Gone.');
+      expect(panel('Fuel').getByRole('button', { name: 'Undo' })).toBeDisabled();
+    });
+
+    it('keeps a redo after a network failure and applies it on retry', async () => {
+      defaults();
+      api.getFuel.mockResolvedValue([fuelRow(8, 'Original')]);
+      const user = userEvent.setup();
+      render(<App />);
+      await editRemark(user, 'First');
+      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
+      await panel('Fuel').findByText('Undid edit of Fuel record.');
+      api.updateFuel.mockRejectedValueOnce(new api.ApiError('Unable to reach the server.', undefined, 'network'));
+      await user.click(panel('Fuel').getByRole('button', { name: redoName }));
+      expect(await panel('Fuel').findByRole('alert')).toHaveTextContent('Unable to reach the server.');
+      expect(panel('Fuel').getByRole('button', { name: redoName })).toBeEnabled();
+
+      await user.click(panel('Fuel').getByRole('button', { name: redoName }));
+      expect(await panel('Fuel').findByRole('status')).toHaveTextContent('Redid edit of Fuel record.');
+    });
+
+    it.each([
+      ['not found', 'not-found'],
+      ['rejected', 'rejected'],
+    ] as const)('drops the entry after a redo fails as %s', async (_label, kind) => {
+      defaults();
+      api.getFuel.mockResolvedValue([fuelRow(8, 'Original')]);
+      const user = userEvent.setup();
+      render(<App />);
+      await editRemark(user, 'First');
+      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
+      await panel('Fuel').findByText('Undid edit of Fuel record.');
+      api.updateFuel.mockRejectedValueOnce(new api.ApiError('Redo refused.', undefined, kind));
+      await user.click(panel('Fuel').getByRole('button', { name: redoName }));
+      expect(await panel('Fuel').findByRole('alert')).toHaveTextContent('Redo refused.');
+      expect(panel('Fuel').getByRole('button', { name: 'Redo' })).toBeDisabled();
+      expect(panel('Fuel').getByRole('button', { name: 'Undo' })).toBeDisabled();
     });
   });
 });
