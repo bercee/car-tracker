@@ -7,6 +7,7 @@ import { CarManager } from './components/CarManager';
 import { ExpensesPanel } from './components/ExpensesPanel';
 import { FuelPanel } from './components/FuelPanel';
 import { StatusMessage } from './components/StatusMessage';
+import { UndoHistory } from './undoHistory';
 
 enum Section {
   Fuel = 'Fuel',
@@ -26,6 +27,17 @@ const byName = (a: Car, b: Car) => {
 };
 
 export function App() {
+  // Undo histories outlive the Panels, which remount on every Car switch.
+  const [histories] = useState(() => new Map<string, UndoHistory>());
+  const historyFor = (car: number, section: Section) => {
+    const key = `${car}:${section}`;
+    let history = histories.get(key);
+    if (!history) {
+      history = new UndoHistory();
+      histories.set(key, history);
+    }
+    return history;
+  };
   const [activeSection, setActiveSection] = useState<Section>(Section.Fuel);
   const [visitedSections, setVisitedSections] = useState<Set<Section>>(() => new Set([Section.Fuel]));
 
@@ -132,17 +144,17 @@ export function App() {
       )}
       {carId !== undefined && visitedSections.has(Section.Fuel) && (
         <div hidden={activeSection !== Section.Fuel}>
-          <FuelPanel key={carId} carId={carId} />
+          <FuelPanel key={carId} carId={carId} history={historyFor(carId, Section.Fuel)} />
         </div>
       )}
       {carId !== undefined && visitedSections.has(Section.AdBlue) && (
         <div hidden={activeSection !== Section.AdBlue}>
-          <AdBluePanel key={carId} carId={carId} />
+          <AdBluePanel key={carId} carId={carId} history={historyFor(carId, Section.AdBlue)} />
         </div>
       )}
       {carId !== undefined && visitedSections.has(Section.Expenses) && (
         <div hidden={activeSection !== Section.Expenses}>
-          <ExpensesPanel key={carId} carId={carId} />
+          <ExpensesPanel key={carId} carId={carId} history={historyFor(carId, Section.Expenses)} />
         </div>
       )}
     </main>
