@@ -24,7 +24,7 @@ const columns: RecordTableColumn<FuelRecord>[] = [
   { header: 'Remark', render: (record) => record.remark ?? '—' },
 ];
 
-export function FuelPanel({ carId, history }: { carId: number; history: UndoHistory }) {
+export function FuelPanel({ carId, history, visible }: { carId: number; history: UndoHistory; visible: boolean }) {
   const load = useCallback(() => getFuel(carId), [carId]);
   const submit = useCallback((value: FuelRequest) => addFuel(carId, value), [carId]);
   const update = useCallback((id: number, value: FuelRequest) => updateFuel(carId, id, value), [carId]);
@@ -33,6 +33,7 @@ export function FuelPanel({ carId, history }: { carId: number; history: UndoHist
     <Panel
       title="Fuel"
       history={history}
+      visible={visible}
       load={load}
       submit={submit}
       update={update}

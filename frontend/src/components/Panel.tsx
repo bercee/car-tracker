@@ -5,6 +5,10 @@ import { useIsMounted } from '../useIsMounted';
 import type { UndoHistory } from '../undoHistory';
 import { StatusMessage } from './StatusMessage';
 
+const isEditable = (target: EventTarget | null) =>
+  target instanceof HTMLElement &&
+  (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+
 export interface PanelActions<R> {
   onEdit: (record: R) => void;
   onDelete: (record: R) => void;
@@ -14,6 +18,8 @@ export interface PanelActions<R> {
 export interface PanelProps<T extends { eventDate: string }, R extends { id: number }> {
   title: string;
   history: UndoHistory;
+  /** Whether this Panel's Section is the one on screen; only then do the shortcuts act. */
+  visible: boolean;
   load: () => Promise<R[]>;
   submit: (value: T) => Promise<R>;
   update: (id: number, value: T) => Promise<unknown>;
@@ -28,6 +34,7 @@ export interface PanelProps<T extends { eventDate: string }, R extends { id: num
 export function Panel<T extends { eventDate: string }, R extends { id: number }>({
   title,
   history,
+  visible,
   load,
   submit,
   update,
@@ -161,6 +168,26 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
       if (isMounted()) setPending(false);
     }
   };
+  const handleShortcut = (verb: 'Undo' | 'Redo') => {
+    const description = verb === 'Undo' ? history.undoDescription() : history.redoDescription();
+    if (pending || description === undefined) return false;
+    void applyUndoRedo(verb);
+    return true;
+  };
+  // Re-subscribes after every render so the listener sees the latest history and pending state.
+  useEffect(() => {
+    if (!visible) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const key = event.key.toLowerCase();
+      const verb =
+        key === 'z' && !event.shiftKey ? 'Undo' : key === 'y' || (key === 'z' && event.shiftKey) ? 'Redo' : undefined;
+      if (!verb || isEditable(event.target)) return;
+      if (handleShortcut(verb)) event.preventDefault();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  });
   const onDelete = async (record: R) => {
     setPending(true);
     setError(undefined);
