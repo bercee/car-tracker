@@ -325,7 +325,11 @@ Two GitHub Actions workflows live in `.github/workflows/`:
   publishes both images to GHCR as `X.Y.Z`, `X.Y`, `sha-<full commit SHA>` and
   `latest`, and finally creates the `v<version>` git tag and a GitHub Release
   with generated notes. It fails early if the version is not `X.Y.Z` or the tag
-  already exists.
+  already exists. Finally it bumps the patch version in every `package.json` and
+  `package-lock.json` and pushes that commit to `main` using the `RELEASE_TOKEN`
+  secret (a fine-grained token with `Contents: Read and write`, owned by a
+  repository admin who can bypass the `main` ruleset). For a minor or major
+  release, edit the version through a pull request before running the workflow.
 
 Before the first publication, ensure GitHub Packages is enabled for the
 repository. The workflow labels each image with its source repository; verify
@@ -348,7 +352,7 @@ docker login ghcr.io
 1. Open a pull request and confirm `verify` and both `images` matrix builds
    pass. Those builds must report `push: false`.
 2. Review and merge the pull request. In GitHub Actions, choose **Release >
-   Run workflow**, select `main`, and enter the version. Confirm both
+   Run workflow**, and select `main`. Confirm both
    `publish-images` matrix entries publish `car-tracker-frontend` and
    `car-tracker-backend` with the same full-SHA tag.
 3. On the home server, pull both exact tags before changing containers:
