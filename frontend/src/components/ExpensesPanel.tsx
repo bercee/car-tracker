@@ -14,7 +14,7 @@ const columns: RecordTableColumn<ExpenseRecord>[] = [
   { header: 'Notes', render: (record) => record.notes ?? '—' },
 ];
 
-export function ExpensesPanel({ carId, history }: { carId: number; history: UndoHistory }) {
+export function ExpensesPanel({ carId, history, visible }: { carId: number; history: UndoHistory; visible: boolean }) {
   const load = useCallback(() => getExpenses(carId), [carId]);
   const submit = useCallback((value: ExpenseRequest) => addExpense(carId, value), [carId]);
   const update = useCallback((id: number, value: ExpenseRequest) => updateExpense(carId, id, value), [carId]);
@@ -23,6 +23,7 @@ export function ExpensesPanel({ carId, history }: { carId: number; history: Undo
     <Panel
       title="Expenses"
       history={history}
+      visible={visible}
       load={load}
       submit={submit}
       update={update}

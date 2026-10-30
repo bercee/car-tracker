@@ -144,17 +144,32 @@ export function App() {
       )}
       {carId !== undefined && visitedSections.has(Section.Fuel) && (
         <div hidden={activeSection !== Section.Fuel}>
-          <FuelPanel key={carId} carId={carId} history={historyFor(carId, Section.Fuel)} />
+          <FuelPanel
+            key={carId}
+            carId={carId}
+            history={historyFor(carId, Section.Fuel)}
+            visible={activeSection === Section.Fuel}
+          />
         </div>
       )}
       {carId !== undefined && visitedSections.has(Section.AdBlue) && (
         <div hidden={activeSection !== Section.AdBlue}>
-          <AdBluePanel key={carId} carId={carId} history={historyFor(carId, Section.AdBlue)} />
+          <AdBluePanel
+            key={carId}
+            carId={carId}
+            history={historyFor(carId, Section.AdBlue)}
+            visible={activeSection === Section.AdBlue}
+          />
         </div>
       )}
       {carId !== undefined && visitedSections.has(Section.Expenses) && (
         <div hidden={activeSection !== Section.Expenses}>
-          <ExpensesPanel key={carId} carId={carId} history={historyFor(carId, Section.Expenses)} />
+          <ExpensesPanel
+            key={carId}
+            carId={carId}
+            history={historyFor(carId, Section.Expenses)}
+            visible={activeSection === Section.Expenses}
+          />
         </div>
       )}
     </main>
