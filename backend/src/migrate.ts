@@ -1,5 +1,5 @@
 import { loadConfig } from './config.js';
-import { runMigrations } from './migrations.js';
+import { runMigrations } from './database/migrations.js';
 
 // Entry point for the one-shot compose `migrate` service; a non-zero exit blocks the backend from starting.
 try {

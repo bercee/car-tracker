@@ -5,7 +5,7 @@ import path from 'node:path';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { runMigrations } from '../../src/migrations.js';
+import { runMigrations } from '../../src/database/migrations.js';
 import type { TestPostgres } from '../helpers/testPostgres.js';
 import { startTestPostgres } from '../helpers/testPostgres.js';
 

@@ -11,8 +11,8 @@ import type {
   FuelInput,
   FuelRecord,
 } from '../domain.js';
-import type { PostgresConnection } from '../postgres.js';
-import { adblue, carNameUniqueIndex, cars, expenses, fuel } from '../schema.js';
+import type { PostgresConnection } from './postgres.js';
+import { adblue, carNameUniqueIndex, cars, expenses, fuel } from './schema.js';
 import type { CarDatabase } from './carDatabase.js';
 import { DuplicateCarNameError } from './errors.js';
 import { mapAdBlueRow, mapCarRow, mapExpenseRow, mapFuelRow } from './mappers.js';

@@ -2,8 +2,8 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createApp } from '../../src/app.js';
-import { createPostgresConnection } from '../../src/postgres.js';
-import type { PostgresConnection } from '../../src/postgres.js';
+import { createPostgresConnection } from '../../src/database/postgres.js';
+import type { PostgresConnection } from '../../src/database/postgres.js';
 import { PostgresCarDatabase } from '../../src/database/postgresCarDatabase.js';
 import type { TestPostgres } from '../helpers/testPostgres.js';
 import { startTestPostgres } from '../helpers/testPostgres.js';

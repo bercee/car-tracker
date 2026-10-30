@@ -1,5 +1,5 @@
 import type { AdBlueRecord, Car, ExpenseRecord, FuelRecord } from '../domain.js';
-import type { adblue, cars, expenses, fuel } from '../schema.js';
+import type { adblue, cars, expenses, fuel } from './schema.js';
 import { formatHufAmount, formatScaledInteger } from '../validation/common.js';
 
 export type CarRow = typeof cars.$inferSelect;

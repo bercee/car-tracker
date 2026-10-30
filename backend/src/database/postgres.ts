@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 
-import type { DatabaseConfig } from './config.js';
+import type { DatabaseConfig } from '../config.js';
 
 export interface PostgresOptions {
   healthTimeoutMs?: number;

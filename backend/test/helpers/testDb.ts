@@ -3,9 +3,9 @@ import { sql } from 'drizzle-orm';
 import type { CarDatabase } from '../../src/database/carDatabase.js';
 import { PostgresCarDatabase } from '../../src/database/postgresCarDatabase.js';
 import type { Car } from '../../src/domain.js';
-import { applyMigrations } from '../../src/migrations.js';
-import { createPostgresConnection } from '../../src/postgres.js';
-import type { PostgresConnection } from '../../src/postgres.js';
+import { applyMigrations } from '../../src/database/migrations.js';
+import { createPostgresConnection } from '../../src/database/postgres.js';
+import type { PostgresConnection } from '../../src/database/postgres.js';
 import { startTestPostgres } from './testPostgres.js';
 import type { TestPostgres } from './testPostgres.js';
 

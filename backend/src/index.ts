@@ -1,7 +1,7 @@
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
 import { PostgresCarDatabase } from './database/postgresCarDatabase.js';
-import { createPostgresConnection } from './postgres.js';
+import { createPostgresConnection } from './database/postgres.js';
 import { createShutdownCoordinator } from './shutdown.js';
 
 try {
