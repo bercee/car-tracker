@@ -27,7 +27,7 @@ describe('Express API', () => {
     logger.error.mockClear();
   });
 
-  it('creates, canonicalizes, and lists a fuel record', async () => {
+  it('creates and lists a fuel record with numeric liters and price', async () => {
     const app = createApp(testDatabase.database, healthy, logger);
     const empty = await request(app).get(`/api/cars/${carId}/fuel`);
     expect(empty.status).toBe(200);
@@ -36,8 +36,8 @@ describe('Express API', () => {
     const created = await request(app).post(`/api/cars/${carId}/fuel`).send({
       eventDate: '2026-09-15',
       odometerKm: 82_450,
-      liters: '47.3',
-      price: '29284',
+      liters: 47.3,
+      price: 29284,
       fullTank: true,
       remark: ' Shell ',
     });
@@ -48,8 +48,8 @@ describe('Express API', () => {
       id: 1,
       eventDate: '2026-09-15',
       odometerKm: 82_450,
-      liters: '47.300',
-      price: '29284',
+      liters: 47.3,
+      price: 29284,
       fullTank: true,
       remark: 'Shell',
     });
@@ -113,8 +113,8 @@ describe('Express API', () => {
         .send({
           eventDate,
           odometerKm: index,
-          liters: '1',
-          price: '600',
+          liters: 1,
+          price: 600,
           fullTank: false,
         })
         .expect(201);
@@ -141,8 +141,8 @@ describe('Express API', () => {
     const specs = [
       [
         `/api/cars/${carId}/fuel`,
-        { eventDate: '2026-09-15', odometerKm: 10, liters: '1', price: '100', fullTank: true, remark: 'old' },
-        { eventDate: '2026-09-16', odometerKm: 11, liters: '2', price: '200', fullTank: false, remark: ' new ' },
+        { eventDate: '2026-09-15', odometerKm: 10, liters: 1, price: 100, fullTank: true, remark: 'old' },
+        { eventDate: '2026-09-16', odometerKm: 11, liters: 2, price: 200, fullTank: false, remark: ' new ' },
       ],
       [
         `/api/cars/${carId}/adblue`,
@@ -177,11 +177,7 @@ describe('Express API', () => {
   });
 
   it.each([
-    [
-      'fuel',
-      { eventDate: 'bad' },
-      { eventDate: '2026-09-15', odometerKm: 1, liters: '1', price: '1', fullTank: false },
-    ],
+    ['fuel', { eventDate: 'bad' }, { eventDate: '2026-09-15', odometerKm: 1, liters: 1, price: 1, fullTank: false }],
     ['adblue', [], { eventDate: '2026-09-15', odometerKm: 1, liters: 1, price: 1 }],
     ['expenses', { eventDate: '2026-09-15', price: 1.5 }, { eventDate: '2026-09-15', price: 1 }],
   ])('rejects invalid PUT bodies without changing %s', async (resource, invalid, valid) => {
@@ -240,7 +236,7 @@ describe('Express API', () => {
     const app = createApp(testDatabase.database, healthy, logger);
     const otherCarId = (await createCar(testDatabase.database, 'Other car')).id;
     const bodies = {
-      fuel: { eventDate: '2026-09-15', odometerKm: 10, liters: '1', price: '100', fullTank: true },
+      fuel: { eventDate: '2026-09-15', odometerKm: 10, liters: 1, price: 100, fullTank: true },
       adblue: { eventDate: '2026-09-15', odometerKm: 10, liters: 1, price: 100 },
       expenses: { eventDate: '2026-09-15', price: 100 },
     };
@@ -355,6 +351,102 @@ describe('Express API', () => {
     expect(response.text).not.toContain('SQL statement');
     expect(response.text).not.toContain('stack');
     expect(logger.error).toHaveBeenCalledOnce();
+  });
+
+  describe('fuel validation', () => {
+    const valid = {
+      eventDate: '2026-09-15',
+      odometerKm: 82_450,
+      liters: 47.3,
+      price: 29_284,
+      fullTank: true,
+      remark: 'Shell',
+    };
+    const path = () => `/api/cars/${carId}/fuel`;
+    const sendJson = (r: request.Test, body: unknown) =>
+      r.set('Content-Type', 'application/json').send(JSON.stringify(body));
+
+    it.each([
+      [47.3, 29_284],
+      [0.001, 0],
+      [9999.999, 9_999_999],
+    ])('round-trips liters %s and price %s exactly as numbers', async (liters, price) => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const created = await request(app)
+        .post(path())
+        .send({ ...valid, liters, price })
+        .expect(201);
+      expect(created.body).toMatchObject({ liters, price });
+      expect((await request(app).get(path())).body).toEqual([created.body]);
+    });
+
+    it('stores blank or absent remarks as null and trims the rest', async () => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      for (const remark of [null, '', '   ']) {
+        const created = await request(app)
+          .post(path())
+          .send({ ...valid, remark })
+          .expect(201);
+        expect(created.body.remark).toBeNull();
+      }
+      const withoutRemark = { ...valid, remark: undefined };
+      expect((await request(app).post(path()).send(withoutRemark).expect(201)).body.remark).toBeNull();
+      const padded = await request(app)
+        .post(path())
+        .send({ ...valid, remark: '  Shell  ' })
+        .expect(201);
+      expect(padded.body.remark).toBe('Shell');
+      const longest = await request(app)
+        .post(path())
+        .send({ ...valid, remark: 'x'.repeat(500) })
+        .expect(201);
+      expect(longest.body.remark).toHaveLength(500);
+    });
+
+    it('updates a fuel record with numbers', async () => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const created = await request(app).post(path()).send(valid).expect(201);
+      const updated = await request(app)
+        .put(`${path()}/${created.body.id}`)
+        .send({ ...valid, liters: 20.5, price: 12_000, fullTank: false, remark: null })
+        .expect(200);
+      expect(updated.body).toMatchObject({
+        id: created.body.id,
+        liters: 20.5,
+        price: 12_000,
+        fullTank: false,
+        remark: null,
+      });
+    });
+
+    it.each([
+      ['zero liters', { ...valid, liters: 0 }, 'liters'],
+      ['four decimal places', { ...valid, liters: 1.2345 }, 'liters'],
+      ['too-large liters', { ...valid, liters: 10_000 }, 'liters'],
+      ['string liters', { ...valid, liters: '47.3' }, 'liters'],
+      ['string price', { ...valid, price: '100' }, 'price'],
+      ['fractional price', { ...valid, price: 1.5 }, 'price'],
+      ['negative price', { ...valid, price: -1 }, 'price'],
+      ['too-large price', { ...valid, price: 10_000_000 }, 'price'],
+      ['negative odometer', { ...valid, odometerKm: -1 }, 'odometerKm'],
+      ['too-large odometer', { ...valid, odometerKm: 10_000_000 }, 'odometerKm'],
+      ['impossible date', { ...valid, eventDate: '2026-02-30' }, 'eventDate'],
+      ['string fullTank', { ...valid, fullTank: 'yes' }, 'fullTank'],
+      ['missing fullTank', { ...valid, fullTank: undefined }, 'fullTank'],
+      ['missing liters', { ...valid, liters: undefined }, 'liters'],
+      ['too-long remark', { ...valid, remark: 'x'.repeat(501) }, 'remark'],
+      ['unknown key', { ...valid, remarks: 'typo' }, 'body'],
+      ['array body', [], 'body'],
+      ['null body', null, 'body'],
+    ])('rejects %s', async (_name, body, field) => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const created = await request(app).post(path()).send(valid).expect(201);
+
+      const rejected = await sendJson(request(app).post(path()), body).expect(400);
+      expect(rejected.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field });
+      await sendJson(request(app).put(`${path()}/${created.body.id}`), body).expect(400);
+      expect((await request(app).get(path())).body).toEqual([created.body]);
+    });
   });
 
   describe('expense validation', () => {

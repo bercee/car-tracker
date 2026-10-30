@@ -29,7 +29,7 @@ describe('api client', () => {
       expect.objectContaining({ headers: { Accept: 'application/json' } }),
     );
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ id: 1 }), { status: 201 }));
-    await addFuel(3, { eventDate: '2026-09-18', odometerKm: 1, liters: '1', price: '1', fullTank: false });
+    await addFuel(3, { eventDate: '2026-09-18', odometerKm: 1, liters: 1, price: 1, fullTank: false, remark: null });
     expect(fetchMock).toHaveBeenLastCalledWith(
       '/api/cars/3/fuel',
       expect.objectContaining({
@@ -80,7 +80,14 @@ describe('api client', () => {
   it('uses member paths and methods, and accepts empty 204 delete responses', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 4 }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
-    await updateFuel(2, 4, { eventDate: '2026-09-18', odometerKm: 1, liters: '1', price: '1', fullTank: false });
+    await updateFuel(2, 4, {
+      eventDate: '2026-09-18',
+      odometerKm: 1,
+      liters: 1,
+      price: 1,
+      fullTank: false,
+      remark: null,
+    });
     expect(fetchMock).toHaveBeenLastCalledWith(
       '/api/cars/2/fuel/4',
       expect.objectContaining({

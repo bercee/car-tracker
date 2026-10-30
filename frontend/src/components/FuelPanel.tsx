@@ -1,19 +1,37 @@
 import { useCallback } from 'react';
 import { addFuel, deleteFuel, getFuel, updateFuel } from '../api';
 import { formatDate, formatLiters, formatMoney, today } from '../format';
-import { isHuf, validateCommon } from '../validation';
-import type { FuelRecord, FuelRequest } from '@car-tracker/contracts';
+import { numberOf, parseRequest } from '../form';
+import { fuelRequestSchema, type FuelRecord, type FuelRequest } from '@car-tracker/contracts';
 import { Panel } from './Panel';
 import { RecordTable, type RecordTableColumn } from './RecordTable';
 
-const initial = (): FuelRequest => ({
+interface FuelForm {
+  eventDate: string;
+  odometerKm: string;
+  liters: string;
+  price: string;
+  fullTank: boolean;
+  remark: string;
+}
+
+const initial = (): FuelForm => ({
   eventDate: today(),
-  odometerKm: 0,
+  odometerKm: '0',
   liters: '',
   price: '',
   fullTank: true,
   remark: '',
 });
+const parse = (form: FuelForm) =>
+  parseRequest(fuelRequestSchema, {
+    eventDate: form.eventDate,
+    odometerKm: numberOf(form.odometerKm),
+    liters: numberOf(form.liters),
+    price: numberOf(form.price),
+    fullTank: form.fullTank,
+    remark: form.remark,
+  });
 const columns: RecordTableColumn<FuelRecord>[] = [
   { header: 'Date', render: (record) => formatDate(record.eventDate) },
   { header: 'Odometer', render: (record) => record.odometerKm.toLocaleString() },
@@ -37,19 +55,14 @@ export function FuelPanel({ carId }: { carId: number }) {
       remove={remove}
       toFormValue={(r) => ({
         eventDate: r.eventDate,
-        odometerKm: r.odometerKm,
-        liters: r.liters,
-        price: r.price,
+        odometerKm: String(r.odometerKm),
+        liters: String(r.liters),
+        price: String(r.price),
         fullTank: r.fullTank,
         remark: r.remark ?? '',
       })}
       initial={initial}
-      parse={(v) => {
-        const error =
-          validateCommon(v.eventDate, String(v.odometerKm), v.liters) ??
-          (!isHuf(v.price) ? 'Enter a whole HUF amount.' : undefined);
-        return error === undefined ? { data: v } : { error };
-      }}
+      parse={parse}
       table={(records, actions) => (
         <RecordTable records={records} columns={columns} actions={{ ...actions, label: 'Fuel' }} />
       )}
@@ -73,7 +86,7 @@ export function FuelPanel({ carId }: { carId: number }) {
               max="9999999"
               step="1"
               value={v.odometerKm}
-              onChange={(e) => set({ ...v, odometerKm: Number(e.target.value) })}
+              onChange={(e) => set({ ...v, odometerKm: e.target.value })}
               required
             />
           </label>
@@ -103,7 +116,7 @@ export function FuelPanel({ carId }: { carId: number }) {
           </label>
           <label>
             Remark
-            <textarea maxLength={500} value={v.remark ?? ''} onChange={(e) => set({ ...v, remark: e.target.value })} />
+            <textarea maxLength={500} value={v.remark} onChange={(e) => set({ ...v, remark: e.target.value })} />
           </label>
         </>
       )}

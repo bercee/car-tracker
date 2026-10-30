@@ -35,13 +35,13 @@ CREATE TABLE "fuel" (
 	"event_date" date NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"odometer_km" integer NOT NULL,
-	"liters_milliliters" integer NOT NULL,
-	"price_huf" integer NOT NULL,
+	"liters" numeric(7, 3) NOT NULL,
+	"price" integer NOT NULL,
 	"full_tank" boolean NOT NULL,
 	"remark" text,
 	CONSTRAINT "fuel_odometer_km_nonnegative" CHECK ("fuel"."odometer_km" >= 0),
-	CONSTRAINT "fuel_liters_milliliters_positive" CHECK ("fuel"."liters_milliliters" > 0),
-	CONSTRAINT "fuel_price_huf_nonnegative" CHECK ("fuel"."price_huf" >= 0),
+	CONSTRAINT "fuel_liters_positive" CHECK ("fuel"."liters" > 0),
+	CONSTRAINT "fuel_price_nonnegative" CHECK ("fuel"."price" >= 0),
 	CONSTRAINT "fuel_remark_length" CHECK ("fuel"."remark" IS NULL OR char_length("fuel"."remark") <= 500)
 );
 --> statement-breakpoint

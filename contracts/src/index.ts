@@ -6,15 +6,6 @@ export const pathIdSchema = z.coerce
   .int({ error: 'must be a positive integer' })
   .positive({ error: 'must be a positive integer' });
 
-export interface FuelRequest {
-  eventDate: string;
-  odometerKm: number;
-  liters: string;
-  price: string;
-  fullTank: boolean;
-  remark?: string | null;
-}
-
 export const dateSchema = z.iso.date({ error: 'Enter a valid date.' });
 
 const PRICE_MESSAGE = 'Enter a whole HUF price from 0 to 9,999,999.';
@@ -55,6 +46,16 @@ export const adBlueRequestSchema = z.strictObject({
 });
 export type AdBlueRequest = z.infer<typeof adBlueRequestSchema>;
 
+export const fuelRequestSchema = z.strictObject({
+  eventDate: dateSchema,
+  odometerKm: odometerSchema,
+  liters: litersSchema,
+  price: priceSchema,
+  fullTank: z.boolean({ error: 'Choose whether the tank was filled.' }),
+  remark: optionalText(500, 'Remark'),
+});
+export type FuelRequest = z.infer<typeof fuelRequestSchema>;
+
 export const expenseRequestSchema = z.strictObject({
   eventDate: dateSchema,
   price: priceSchema,
@@ -80,7 +81,6 @@ export interface Car extends CarRequest {
 export interface FuelRecord extends FuelRequest {
   id: number;
   createdAt: string;
-  remark: string | null;
 }
 
 export interface AdBlueRecord extends AdBlueRequest {

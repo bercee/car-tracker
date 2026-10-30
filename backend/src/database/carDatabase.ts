@@ -5,8 +5,8 @@ import type {
   CarRequest,
   ExpenseRecord,
   ExpenseRequest,
-  FuelInput,
   FuelRecord,
+  FuelRequest,
 } from '../domain.js';
 
 export interface CarDatabase {
@@ -14,8 +14,8 @@ export interface CarDatabase {
   getCar(id: number): Promise<Car | undefined>;
   addCar(input: CarRequest): Promise<Car>;
   renameCar(id: number, input: CarRequest): Promise<Car | undefined>;
-  addFuel(carId: number, input: FuelInput): Promise<FuelRecord>;
-  updateFuel(carId: number, id: number, input: FuelInput): Promise<FuelRecord | undefined>;
+  addFuel(carId: number, input: FuelRequest): Promise<FuelRecord>;
+  updateFuel(carId: number, id: number, input: FuelRequest): Promise<FuelRecord | undefined>;
   deleteFuel(carId: number, id: number): Promise<boolean>;
   listFuel(carId: number): Promise<FuelRecord[]>;
   addAdBlue(carId: number, input: AdBlueRequest): Promise<AdBlueRecord>;

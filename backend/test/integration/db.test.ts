@@ -28,8 +28,8 @@ describe('PostgresCarDatabase', () => {
     const fuel = await database.addFuel(car.id, {
       eventDate: '2026-09-15',
       odometerKm: 82_450,
-      litersMilliliters: 47_300,
-      priceHuf: 29_284,
+      liters: 47.3,
+      price: 29_284,
       fullTank: true,
       remark: 'Shell',
     });
@@ -49,8 +49,8 @@ describe('PostgresCarDatabase', () => {
       id: 1,
       eventDate: '2026-09-15',
       odometerKm: 82_450,
-      liters: '47.300',
-      price: '29284',
+      liters: 47.3,
+      price: 29_284,
       fullTank: true,
       remark: 'Shell',
     });
@@ -70,24 +70,24 @@ describe('PostgresCarDatabase', () => {
     await database.addFuel(car.id, {
       eventDate: '2026-01-01',
       odometerKm: 1,
-      litersMilliliters: 1000,
-      priceHuf: 600,
+      liters: 1,
+      price: 600,
       fullTank: false,
       remark: null,
     });
     await database.addFuel(car.id, {
       eventDate: '2026-02-01',
       odometerKm: 2,
-      litersMilliliters: 2000,
-      priceHuf: 610,
+      liters: 2,
+      price: 610,
       fullTank: true,
       remark: null,
     });
     await database.addFuel(car.id, {
       eventDate: '2026-02-01',
       odometerKm: 3,
-      litersMilliliters: 3000,
-      priceHuf: 620,
+      liters: 3,
+      price: 620,
       fullTank: true,
       remark: null,
     });
@@ -125,16 +125,16 @@ describe('PostgresCarDatabase', () => {
     const fuel = await database.addFuel(car.id, {
       eventDate: '2026-01-01',
       odometerKm: 1,
-      litersMilliliters: 1000,
-      priceHuf: 100,
+      liters: 1,
+      price: 100,
       fullTank: false,
       remark: null,
     });
     const otherFuel = await database.addFuel(car.id, {
       eventDate: '2026-02-01',
       odometerKm: 2,
-      litersMilliliters: 2000,
-      priceHuf: 200,
+      liters: 2,
+      price: 200,
       fullTank: true,
       remark: null,
     });
@@ -148,8 +148,8 @@ describe('PostgresCarDatabase', () => {
     const changedFuel = await database.updateFuel(car.id, fuel.id, {
       eventDate: '2026-03-01',
       odometerKm: 22,
-      litersMilliliters: 22300,
-      priceHuf: 22000,
+      liters: 22.3,
+      price: 22000,
       fullTank: true,
       remark: 'updated',
     });
@@ -168,7 +168,7 @@ describe('PostgresCarDatabase', () => {
       id: fuel.id,
       createdAt: fuel.createdAt,
       eventDate: '2026-03-01',
-      liters: '22.300',
+      liters: 22.3,
       remark: 'updated',
     });
     expect(changedBlue).toMatchObject({
@@ -189,8 +189,8 @@ describe('PostgresCarDatabase', () => {
       await database.updateFuel(car.id, 999, {
         eventDate: '2026-03-01',
         odometerKm: 2,
-        litersMilliliters: 1000,
-        priceHuf: 100,
+        liters: 1,
+        price: 100,
         fullTank: false,
         remark: null,
       }),
@@ -242,8 +242,8 @@ describe('PostgresCarDatabase', () => {
     const fuel = {
       eventDate: '2026-01-01',
       odometerKm: 1,
-      litersMilliliters: 1000,
-      priceHuf: 100,
+      liters: 1,
+      price: 100,
       fullTank: false,
       remark: null,
     };

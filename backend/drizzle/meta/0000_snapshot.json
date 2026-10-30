@@ -1,5 +1,5 @@
 {
-  "id": "4e2ef087-c593-4212-9bd0-bcdec8f4e675",
+  "id": "7f8684c7-9ff9-4c7a-990c-1aad467e2096",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -348,14 +348,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "liters_milliliters": {
-          "name": "liters_milliliters",
-          "type": "integer",
+        "liters": {
+          "name": "liters",
+          "type": "numeric(7, 3)",
           "primaryKey": false,
           "notNull": true
         },
-        "price_huf": {
-          "name": "price_huf",
+        "price": {
+          "name": "price",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -425,13 +425,13 @@
           "name": "fuel_odometer_km_nonnegative",
           "value": "\"fuel\".\"odometer_km\" >= 0"
         },
-        "fuel_liters_milliliters_positive": {
-          "name": "fuel_liters_milliliters_positive",
-          "value": "\"fuel\".\"liters_milliliters\" > 0"
+        "fuel_liters_positive": {
+          "name": "fuel_liters_positive",
+          "value": "\"fuel\".\"liters\" > 0"
         },
-        "fuel_price_huf_nonnegative": {
-          "name": "fuel_price_huf_nonnegative",
-          "value": "\"fuel\".\"price_huf\" >= 0"
+        "fuel_price_nonnegative": {
+          "name": "fuel_price_nonnegative",
+          "value": "\"fuel\".\"price\" >= 0"
         },
         "fuel_remark_length": {
           "name": "fuel_remark_length",

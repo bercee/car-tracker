@@ -8,8 +8,8 @@ import type {
   CarRequest,
   ExpenseRecord,
   ExpenseRequest,
-  FuelInput,
   FuelRecord,
+  FuelRequest,
 } from '../domain.js';
 import type { PostgresConnection } from './postgres.js';
 import { adblue, carNameUniqueIndex, cars, expenses, fuel } from './schema.js';
@@ -56,7 +56,7 @@ export class PostgresCarDatabase implements CarDatabase {
     }
   }
 
-  async addFuel(carId: number, input: FuelInput): Promise<FuelRecord> {
+  async addFuel(carId: number, input: FuelRequest): Promise<FuelRecord> {
     const [row] = await this.#db
       .insert(fuel)
       .values({ carId, ...input })
@@ -73,7 +73,7 @@ export class PostgresCarDatabase implements CarDatabase {
     return rows.map(mapFuelRow);
   }
 
-  async updateFuel(carId: number, id: number, input: FuelInput): Promise<FuelRecord | undefined> {
+  async updateFuel(carId: number, id: number, input: FuelRequest): Promise<FuelRecord | undefined> {
     const [row] = await this.#db
       .update(fuel)
       .set(input)
