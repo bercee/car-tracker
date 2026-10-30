@@ -26,7 +26,6 @@ import {
 
 export class SqliteCarDatabase implements CarDatabase {
   readonly #connection: Database.Database;
-  readonly #checkHealth: Statement;
   readonly #insertCar: Statement;
   readonly #selectCarById: Statement<[bigint | number]>;
   readonly #listCars: Statement;
@@ -49,7 +48,6 @@ export class SqliteCarDatabase implements CarDatabase {
 
   constructor(connection: Database.Database) {
     this.#connection = connection;
-    this.#checkHealth = connection.prepare('SELECT 1');
     this.#insertCar = connection.prepare('INSERT INTO cars (name) VALUES (?)');
     this.#selectCarById = connection.prepare('SELECT * FROM cars WHERE id = ?');
     this.#listCars = connection.prepare('SELECT * FROM cars ORDER BY name COLLATE NOCASE, id');
@@ -87,10 +85,6 @@ export class SqliteCarDatabase implements CarDatabase {
       'UPDATE expenses SET event_date = ?, amount_huf = ?, notes = ? WHERE id = ? AND car_id = ?',
     );
     this.#deleteExpense = connection.prepare('DELETE FROM expenses WHERE id = ? AND car_id = ?');
-  }
-
-  checkHealth(): void {
-    this.#checkHealth.get();
   }
 
   listCars(): Car[] {

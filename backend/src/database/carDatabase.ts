@@ -10,7 +10,6 @@ import type {
 } from '../domain.js';
 
 export interface CarDatabase {
-  checkHealth(): void;
   listCars(): Car[];
   getCar(id: number): Car | undefined;
   addCar(input: CarInput): Car;
