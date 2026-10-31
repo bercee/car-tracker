@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import type { Car } from '@car-tracker/contracts';
 import { getCars } from './api';
 import { pickActiveCar, readStoredCarId, storeCarId } from './carSelection';
@@ -6,7 +6,9 @@ import { AdBluePanel } from './components/AdBluePanel';
 import { CarManager } from './components/CarManager';
 import { ExpensesPanel } from './components/ExpensesPanel';
 import { FuelPanel } from './components/FuelPanel';
+import type { RecordPanelProps } from './components/Panel';
 import { StatusMessage } from './components/StatusMessage';
+import { UndoHistory } from './undoHistory';
 
 enum Section {
   Fuel = 'Fuel',
@@ -15,7 +17,12 @@ enum Section {
   Cars = 'Cars',
 }
 
-const recordSections = [Section.Fuel, Section.AdBlue, Section.Expenses];
+const recordPanels: [Section, ComponentType<RecordPanelProps>][] = [
+  [Section.Fuel, FuelPanel],
+  [Section.AdBlue, AdBluePanel],
+  [Section.Expenses, ExpensesPanel],
+];
+const recordSections = recordPanels.map(([section]) => section);
 
 // Folds only ASCII A-Z, matching the backend's car ordering (see PostgresCarDatabase.listCars).
 const foldAscii = (name: string) => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
@@ -26,6 +33,17 @@ const byName = (a: Car, b: Car) => {
 };
 
 export function App() {
+  // Undo histories outlive the Panels, which remount on every Car switch.
+  const [undoHistories] = useState(() => new Map<string, UndoHistory>());
+  const undoHistoryFor = (car: number, section: Section) => {
+    const key = `${car}:${section}`;
+    let undoHistory = undoHistories.get(key);
+    if (!undoHistory) {
+      undoHistory = new UndoHistory();
+      undoHistories.set(key, undoHistory);
+    }
+    return undoHistory;
+  };
   const [activeSection, setActiveSection] = useState<Section>(Section.Fuel);
   const [visitedSections, setVisitedSections] = useState<Set<Section>>(() => new Set([Section.Fuel]));
 
@@ -130,21 +148,20 @@ export function App() {
           {carId === undefined && <p>No cars yet. Add a car to start tracking.</p>}
         </div>
       )}
-      {carId !== undefined && visitedSections.has(Section.Fuel) && (
-        <div hidden={activeSection !== Section.Fuel}>
-          <FuelPanel key={carId} carId={carId} />
-        </div>
-      )}
-      {carId !== undefined && visitedSections.has(Section.AdBlue) && (
-        <div hidden={activeSection !== Section.AdBlue}>
-          <AdBluePanel key={carId} carId={carId} />
-        </div>
-      )}
-      {carId !== undefined && visitedSections.has(Section.Expenses) && (
-        <div hidden={activeSection !== Section.Expenses}>
-          <ExpensesPanel key={carId} carId={carId} />
-        </div>
-      )}
+      {carId !== undefined &&
+        recordPanels.map(
+          ([section, RecordPanel]) =>
+            visitedSections.has(section) && (
+              <div key={section} hidden={activeSection !== section}>
+                <RecordPanel
+                  key={carId}
+                  carId={carId}
+                  undoHistory={undoHistoryFor(carId, section)}
+                  visible={activeSection === section}
+                />
+              </div>
+            ),
+        )}
     </main>
   );
 }
