@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { carRequestSchema, type Car } from '@car-tracker/contracts';
 
 import { addCar, ApiError, renameCar } from '../api';
+import { parseRequest } from '../form';
 import { useIsMounted } from '../useIsMounted';
 import { StatusMessage } from './StatusMessage';
 
@@ -35,9 +36,9 @@ function CarForm({
   const isMounted = useIsMounted();
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    const parsed = carRequestSchema.safeParse({ name });
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]!.message);
+    const parsed = parseRequest(carRequestSchema, { name });
+    if ('error' in parsed) {
+      setError(parsed.error);
       setMessage(undefined);
       return;
     }
