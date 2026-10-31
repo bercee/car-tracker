@@ -1,5 +1,16 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, date, index, integer, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  date,
+  index,
+  integer,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 
 export const carNameUniqueIndex = 'cars_name_lower_key';
 
@@ -31,16 +42,16 @@ export const fuel = pgTable(
     eventDate: eventDate(),
     createdAt: createdAt(),
     odometerKm: integer('odometer_km').notNull(),
-    litersMilliliters: integer('liters_milliliters').notNull(),
-    priceHuf: integer('price_huf').notNull(),
+    liters: numeric({ precision: 7, scale: 3, mode: 'number' }).notNull(),
+    price: integer().notNull(),
     fullTank: boolean('full_tank').notNull(),
     remark: text(),
   },
   (table) => [
     index('idx_fuel_car_event_date').on(table.carId, table.eventDate.desc().nullsFirst(), table.id.desc().nullsFirst()),
     check('fuel_odometer_km_nonnegative', sql`${table.odometerKm} >= 0`),
-    check('fuel_liters_milliliters_positive', sql`${table.litersMilliliters} > 0`),
-    check('fuel_price_huf_nonnegative', sql`${table.priceHuf} >= 0`),
+    check('fuel_liters_positive', sql`${table.liters} > 0`),
+    check('fuel_price_nonnegative', sql`${table.price} >= 0`),
     check('fuel_remark_length', sql`${table.remark} IS NULL OR char_length(${table.remark}) <= 500`),
   ],
 );
@@ -55,8 +66,8 @@ export const adblue = pgTable(
     eventDate: eventDate(),
     createdAt: createdAt(),
     odometerKm: integer('odometer_km').notNull(),
-    litersMilliliters: integer('liters_milliliters').notNull(),
-    priceHuf: integer('price_huf').notNull(),
+    liters: numeric({ precision: 7, scale: 3, mode: 'number' }).notNull(),
+    price: integer().notNull(),
   },
   (table) => [
     index('idx_adblue_car_event_date').on(
@@ -65,8 +76,8 @@ export const adblue = pgTable(
       table.id.desc().nullsFirst(),
     ),
     check('adblue_odometer_km_nonnegative', sql`${table.odometerKm} >= 0`),
-    check('adblue_liters_milliliters_positive', sql`${table.litersMilliliters} > 0`),
-    check('adblue_price_huf_nonnegative', sql`${table.priceHuf} >= 0`),
+    check('adblue_liters_positive', sql`${table.liters} > 0`),
+    check('adblue_price_nonnegative', sql`${table.price} >= 0`),
   ],
 );
 
@@ -79,7 +90,7 @@ export const expenses = pgTable(
       .references(() => cars.id, { onDelete: 'restrict' }),
     eventDate: eventDate(),
     createdAt: createdAt(),
-    amountHuf: integer('amount_huf').notNull(),
+    price: integer().notNull(),
     notes: text(),
   },
   (table) => [
@@ -88,7 +99,7 @@ export const expenses = pgTable(
       table.eventDate.desc().nullsFirst(),
       table.id.desc().nullsFirst(),
     ),
-    check('expenses_amount_huf_nonnegative', sql`${table.amountHuf} >= 0`),
+    check('expenses_price_nonnegative', sql`${table.price} >= 0`),
     check('expenses_notes_length', sql`${table.notes} IS NULL OR char_length(${table.notes}) <= 1000`),
   ],
 );

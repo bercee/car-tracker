@@ -1,17 +1,31 @@
 import { useCallback } from 'react';
 import { addAdBlue, deleteAdBlue, getAdBlue, updateAdBlue } from '../api';
 import { formatDate, formatLiters, formatMoney, today } from '../format';
-import { isHuf, validateCommon } from '../validation';
-import type { AdBlueRecord, AdBlueRequest } from '@car-tracker/contracts';
+import { numberOf, parseRequest } from '../form';
+import { adBlueRequestSchema, type AdBlueRecord, type AdBlueRequest } from '@car-tracker/contracts';
 import { Panel } from './Panel';
 import { RecordTable, type RecordTableColumn } from './RecordTable';
 
-const initial = (): AdBlueRequest => ({ eventDate: today(), odometerKm: 0, liters: '', price: '' });
+interface AdBlueForm {
+  eventDate: string;
+  odometerKm: string;
+  liters: string;
+  price: string;
+}
+
+const initial = (): AdBlueForm => ({ eventDate: today(), odometerKm: '0', liters: '', price: '' });
+const parse = (form: AdBlueForm) =>
+  parseRequest(adBlueRequestSchema, {
+    eventDate: form.eventDate,
+    odometerKm: numberOf(form.odometerKm),
+    liters: numberOf(form.liters),
+    price: numberOf(form.price),
+  });
 const columns: RecordTableColumn<AdBlueRecord>[] = [
   { header: 'Date', render: (record) => formatDate(record.eventDate) },
   { header: 'Odometer', render: (record) => record.odometerKm.toLocaleString() },
   { header: 'Liters', render: (record) => formatLiters(record.liters) },
-  { header: 'Amount', render: (record) => formatMoney(record.price) },
+  { header: 'Price', render: (record) => formatMoney(record.price) },
 ];
 
 export function AdBluePanel({ carId }: { carId: number }) {
@@ -26,12 +40,14 @@ export function AdBluePanel({ carId }: { carId: number }) {
       submit={submit}
       update={update}
       remove={remove}
-      toFormValue={(r) => ({ eventDate: r.eventDate, odometerKm: r.odometerKm, liters: r.liters, price: r.price })}
+      toFormValue={(r) => ({
+        eventDate: r.eventDate,
+        odometerKm: String(r.odometerKm),
+        liters: String(r.liters),
+        price: String(r.price),
+      })}
       initial={initial}
-      validate={(v) =>
-        validateCommon(v.eventDate, String(v.odometerKm), v.liters) ??
-        (!isHuf(v.price) ? 'Enter a whole HUF amount.' : undefined)
-      }
+      parse={parse}
       table={(records, actions) => (
         <RecordTable records={records} columns={columns} actions={{ ...actions, label: 'AdBlue' }} />
       )}
@@ -54,7 +70,7 @@ export function AdBluePanel({ carId }: { carId: number }) {
               min="0"
               max="9999999"
               value={v.odometerKm}
-              onChange={(e) => set({ ...v, odometerKm: Number(e.target.value) })}
+              onChange={(e) => set({ ...v, odometerKm: e.target.value })}
               required
             />
           </label>

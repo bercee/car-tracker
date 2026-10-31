@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 
 import { ApiError } from '../api';
+import type { Parsed } from '../form';
 import { useIsMounted } from '../useIsMounted';
 import { StatusMessage } from './StatusMessage';
 
@@ -10,20 +11,20 @@ export interface PanelActions<R> {
   disabled: boolean;
 }
 
-export interface PanelProps<T, R extends { id: number }> {
+export interface PanelProps<T, Q, R extends { id: number }> {
   title: string;
   load: () => Promise<R[]>;
-  submit: (value: T) => Promise<unknown>;
-  update: (id: number, value: T) => Promise<unknown>;
+  submit: (value: Q) => Promise<unknown>;
+  update: (id: number, value: Q) => Promise<unknown>;
   remove: (id: number) => Promise<void>;
   toFormValue: (record: R) => T;
   initial: () => T;
-  validate: (value: T) => string | undefined;
+  parse: (value: T) => Parsed<Q>;
   children: (value: T, setValue: (value: T) => void, disabled: boolean) => ReactNode;
   table: (records: R[], actions: PanelActions<R>) => ReactNode;
 }
 
-export function Panel<T, R extends { id: number }>({
+export function Panel<T, Q, R extends { id: number }>({
   title,
   load,
   submit,
@@ -31,10 +32,10 @@ export function Panel<T, R extends { id: number }>({
   remove,
   toFormValue,
   initial,
-  validate,
+  parse,
   children,
   table,
-}: PanelProps<T, R>) {
+}: PanelProps<T, Q, R>) {
   const [value, setValue] = useState(initial);
   const [records, setRecords] = useState<R[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,9 +86,9 @@ export function Panel<T, R extends { id: number }>({
   };
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    const invalid = validate(value);
-    if (invalid) {
-      setError(invalid);
+    const parsed = parse(value);
+    if ('error' in parsed) {
+      setError(parsed.error);
       return;
     }
     const wasEditing = editingId !== undefined;
@@ -95,8 +96,8 @@ export function Panel<T, R extends { id: number }>({
     setError(undefined);
     setMessage(undefined);
     try {
-      if (wasEditing) await update(editingId!, value);
-      else await submit(value);
+      if (wasEditing) await update(editingId!, parsed.data);
+      else await submit(parsed.data);
       if (!isMounted()) return;
       setValue(initial());
       setEditingId(undefined);
@@ -134,7 +135,7 @@ export function Panel<T, R extends { id: number }>({
   return (
     <section aria-labelledby={`${title}-heading`}>
       <h2 id={`${title}-heading`}>{title}</h2>
-      <form onSubmit={onSubmit}>
+      <form onSubmit={onSubmit} noValidate>
         <fieldset disabled={pending}>
           <legend>
             {editingId === undefined ? `Add ${title.toLowerCase()} record` : `Edit ${title.toLowerCase()} record`}

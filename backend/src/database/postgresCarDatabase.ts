@@ -2,14 +2,14 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import pg from 'pg';
 
 import type {
-  AdBlueInput,
   AdBlueRecord,
+  AdBlueRequest,
   Car,
-  CarInput,
-  ExpenseInput,
+  CarRequest,
   ExpenseRecord,
-  FuelInput,
+  ExpenseRequest,
   FuelRecord,
+  FuelRequest,
 } from '../domain.js';
 import type { PostgresConnection } from './postgres.js';
 import { adblue, carNameUniqueIndex, cars, expenses, fuel } from './schema.js';
@@ -38,7 +38,7 @@ export class PostgresCarDatabase implements CarDatabase {
     return row && mapCarRow(row);
   }
 
-  async addCar(input: CarInput): Promise<Car> {
+  async addCar(input: CarRequest): Promise<Car> {
     try {
       const [row] = await this.#db.insert(cars).values(input).returning();
       return mapCarRow(row!);
@@ -47,7 +47,7 @@ export class PostgresCarDatabase implements CarDatabase {
     }
   }
 
-  async renameCar(id: number, input: CarInput): Promise<Car | undefined> {
+  async renameCar(id: number, input: CarRequest): Promise<Car | undefined> {
     try {
       const [row] = await this.#db.update(cars).set(input).where(eq(cars.id, id)).returning();
       return row && mapCarRow(row);
@@ -56,7 +56,7 @@ export class PostgresCarDatabase implements CarDatabase {
     }
   }
 
-  async addFuel(carId: number, input: FuelInput): Promise<FuelRecord> {
+  async addFuel(carId: number, input: FuelRequest): Promise<FuelRecord> {
     const [row] = await this.#db
       .insert(fuel)
       .values({ carId, ...input })
@@ -73,7 +73,7 @@ export class PostgresCarDatabase implements CarDatabase {
     return rows.map(mapFuelRow);
   }
 
-  async updateFuel(carId: number, id: number, input: FuelInput): Promise<FuelRecord | undefined> {
+  async updateFuel(carId: number, id: number, input: FuelRequest): Promise<FuelRecord | undefined> {
     const [row] = await this.#db
       .update(fuel)
       .set(input)
@@ -90,7 +90,7 @@ export class PostgresCarDatabase implements CarDatabase {
     return rows.length === 1;
   }
 
-  async addAdBlue(carId: number, input: AdBlueInput): Promise<AdBlueRecord> {
+  async addAdBlue(carId: number, input: AdBlueRequest): Promise<AdBlueRecord> {
     const [row] = await this.#db
       .insert(adblue)
       .values({ carId, ...input })
@@ -107,7 +107,7 @@ export class PostgresCarDatabase implements CarDatabase {
     return rows.map(mapAdBlueRow);
   }
 
-  async updateAdBlue(carId: number, id: number, input: AdBlueInput): Promise<AdBlueRecord | undefined> {
+  async updateAdBlue(carId: number, id: number, input: AdBlueRequest): Promise<AdBlueRecord | undefined> {
     const [row] = await this.#db
       .update(adblue)
       .set(input)
@@ -124,7 +124,7 @@ export class PostgresCarDatabase implements CarDatabase {
     return rows.length === 1;
   }
 
-  async addExpense(carId: number, input: ExpenseInput): Promise<ExpenseRecord> {
+  async addExpense(carId: number, input: ExpenseRequest): Promise<ExpenseRecord> {
     const [row] = await this.#db
       .insert(expenses)
       .values({ carId, ...input })
@@ -141,7 +141,7 @@ export class PostgresCarDatabase implements CarDatabase {
     return rows.map(mapExpenseRow);
   }
 
-  async updateExpense(carId: number, id: number, input: ExpenseInput): Promise<ExpenseRecord | undefined> {
+  async updateExpense(carId: number, id: number, input: ExpenseRequest): Promise<ExpenseRecord | undefined> {
     const [row] = await this.#db
       .update(expenses)
       .set(input)

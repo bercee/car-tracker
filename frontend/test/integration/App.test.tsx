@@ -26,6 +26,7 @@ const api = vi.hoisted(() => {
 });
 vi.mock('../../src/api', () => api);
 import { App } from '../../src/App';
+import { formatMoney } from '../../src/format';
 
 const cars = [
   { id: 1, name: 'Golf', createdAt: '' },
@@ -35,8 +36,8 @@ const fuelRow = (id: number, remark: string) => ({
   id,
   eventDate: '2026-09-18',
   odometerKm: 10 * id,
-  liters: '1.000',
-  price: '619',
+  liters: 1,
+  price: 619,
   fullTank: true,
   remark,
 });
@@ -98,8 +99,8 @@ describe('App', () => {
         id: 1,
         eventDate: '2026-09-18',
         odometerKm: 1,
-        liters: '1.000',
-        price: '619',
+        liters: 1,
+        price: 619,
         fullTank: true,
         remark: null,
       },
@@ -107,16 +108,16 @@ describe('App', () => {
         id: 2,
         eventDate: '2026-09-17',
         odometerKm: 2,
-        liters: '2.000',
-        price: '620',
+        liters: 2,
+        price: 620,
         fullTank: false,
         remark: 'Station',
       },
     ]);
-    api.getAdBlue.mockResolvedValue([{ id: 1, eventDate: '2026-09-18', odometerKm: 2, liters: '2.000', price: '500' }]);
+    api.getAdBlue.mockResolvedValue([{ id: 1, eventDate: '2026-09-18', odometerKm: 2, liters: 2, price: 500 }]);
     api.getExpenses.mockResolvedValue([
-      { id: 1, eventDate: '2026-09-18', amount: '1000', notes: 'Service' },
-      { id: 2, eventDate: '2026-09-17', amount: '500', notes: null },
+      { id: 1, eventDate: '2026-09-18', price: 1000, notes: 'Service' },
+      { id: 2, eventDate: '2026-09-17', price: 500, notes: null },
     ]);
     const user = userEvent.setup();
     render(<App />);
@@ -127,6 +128,7 @@ describe('App', () => {
     await screen.findAllByText('2.000 L');
     await user.click(screen.getByRole('tab', { name: 'Expenses' }));
     await screen.findByText('Service');
+    expect(screen.getByText(formatMoney(1000).replace(/\s/g, ' '))).toBeInTheDocument();
     expect(screen.getAllByText('—')).toHaveLength(2);
     await user.click(screen.getByRole('tab', { name: 'Fuel' }));
     expect(api.getFuel).toHaveBeenCalledTimes(1);
@@ -139,7 +141,40 @@ describe('App', () => {
     await user.type(screen.getByLabelText('Liters'), '1.9999');
     await user.type(screen.getByLabelText('Total price (HUF)'), '619');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
-    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('up to three decimal');
+    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('three decimal');
+    expect(api.addFuel).not.toHaveBeenCalled();
+  });
+
+  it('blocks invalid fuel input without calling the API and treats empty number fields as missing', async () => {
+    defaults();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    const save = async () => {
+      await user.click(screen.getByRole('button', { name: 'Save record' }));
+      return (await screen.findAllByRole('alert')).at(-1)!;
+    };
+    const fill = async (label: string, text: string) => {
+      await user.clear(screen.getByLabelText(label));
+      if (text !== '') await user.type(screen.getByLabelText(label), text);
+    };
+
+    await fill('Total price (HUF)', '619');
+    expect(await save()).toHaveTextContent('liters');
+    await fill('Liters', '0');
+    expect(await save()).toHaveTextContent('liters');
+    await fill('Liters', '10000');
+    expect(await save()).toHaveTextContent('liters');
+    await fill('Liters', '5');
+    await fill('Total price (HUF)', '');
+    expect(await save()).toHaveTextContent('HUF price');
+    await fill('Total price (HUF)', '10000000');
+    expect(await save()).toHaveTextContent('HUF price');
+    await fill('Total price (HUF)', '619');
+    await fill('Odometer (km)', '-1');
+    expect(await save()).toHaveTextContent('odometer');
+    await fill('Odometer (km)', '');
+    expect(await save()).toHaveTextContent('odometer');
     expect(api.addFuel).not.toHaveBeenCalled();
   });
 
@@ -152,21 +187,109 @@ describe('App', () => {
     await user.type(screen.getByLabelText('Liters'), '1');
     await user.type(screen.getByLabelText('Total price (HUF)'), '619.5');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
-    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF amount');
+    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF price');
 
     await user.click(screen.getByRole('tab', { name: 'AdBlue' }));
     await screen.findAllByLabelText('Total price (HUF)');
     await user.type(screen.getAllByLabelText('Liters').at(-1)!, '1');
     await user.type(screen.getAllByLabelText('Total price (HUF)').at(-1)!, '500.5');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
-    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF amount');
+    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF price');
 
     await user.click(screen.getByRole('tab', { name: 'Expenses' }));
-    await screen.findByLabelText('Amount (HUF)');
-    await user.type(screen.getByLabelText('Amount (HUF)'), '100.5');
+    await screen.findByLabelText('Price (HUF)');
+    await user.type(screen.getByLabelText('Price (HUF)'), '100.5');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
-    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF amount');
+    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('whole HUF price');
   });
+  it('blocks invalid expense input without calling the API and treats an empty Price as missing', async () => {
+    defaults();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'Expenses' }));
+    await screen.findByLabelText('Price (HUF)');
+
+    await user.click(screen.getByRole('button', { name: 'Save record' }));
+    expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('HUF price');
+
+    for (const price of ['-5', '10000000', 'abc']) {
+      await user.clear(screen.getByLabelText('Price (HUF)'));
+      await user.type(screen.getByLabelText('Price (HUF)'), price);
+      await user.click(screen.getByRole('button', { name: 'Save record' }));
+      expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('HUF price');
+    }
+    expect(api.addExpense).not.toHaveBeenCalled();
+  });
+
+  it('sends the expense Price as a number and trims blank notes to null', async () => {
+    defaults();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'Expenses' }));
+    await user.type(await screen.findByLabelText('Price (HUF)'), '32000');
+    await user.type(screen.getByLabelText('Notes'), '   ');
+    await user.click(screen.getByRole('button', { name: 'Save record' }));
+    await waitFor(() =>
+      expect(api.addExpense).toHaveBeenCalledWith(1, { eventDate: expect.any(String), price: 32_000, notes: null }),
+    );
+  });
+
+  it('blocks invalid AdBlue input without calling the API and treats empty number fields as missing', async () => {
+    defaults();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'AdBlue' }));
+    await screen.findAllByLabelText('Total price (HUF)');
+    const field = (label: string) => screen.getAllByLabelText(label).at(-1)!;
+    const save = async () => {
+      await user.click(screen.getByRole('button', { name: 'Save record' }));
+      return (await screen.findAllByRole('alert')).at(-1)!;
+    };
+    const fill = async (label: string, text: string) => {
+      await user.clear(field(label));
+      if (text !== '') await user.type(field(label), text);
+    };
+
+    await fill('Total price (HUF)', '500');
+    expect(await save()).toHaveTextContent('liters');
+    await fill('Liters', '1.2345');
+    expect(await save()).toHaveTextContent('liters');
+    await fill('Liters', '0');
+    expect(await save()).toHaveTextContent('liters');
+    await fill('Liters', '10000');
+    expect(await save()).toHaveTextContent('liters');
+    await fill('Liters', '5');
+    await fill('Total price (HUF)', '');
+    expect(await save()).toHaveTextContent('HUF price');
+    await fill('Total price (HUF)', '500');
+    await fill('Odometer (km)', '');
+    expect(await save()).toHaveTextContent('odometer');
+    expect(api.addAdBlue).not.toHaveBeenCalled();
+  });
+
+  it('sends AdBlue liters and Price as numbers and shows liters with three decimals', async () => {
+    defaults();
+    api.getAdBlue.mockResolvedValue([{ id: 1, eventDate: '2026-09-18', odometerKm: 2, liters: 2.5, price: 500 }]);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'AdBlue' }));
+    expect(await screen.findByText('2.500 L')).toBeInTheDocument();
+    await user.type(screen.getAllByLabelText('Liters').at(-1)!, '47.3');
+    await user.type(screen.getAllByLabelText('Total price (HUF)').at(-1)!, '7490');
+    await user.click(screen.getByRole('button', { name: 'Save record' }));
+    await waitFor(() =>
+      expect(api.addAdBlue).toHaveBeenCalledWith(1, {
+        eventDate: expect.any(String),
+        odometerKm: 0,
+        liters: 47.3,
+        price: 7490,
+      }),
+    );
+  });
+
   it('submits fuel and refreshes', async () => {
     defaults();
     let resolve: (() => void) | undefined;
@@ -185,7 +308,14 @@ describe('App', () => {
     await user.type(screen.getByLabelText('Remark'), 'Shell');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
     expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
-    expect(api.addFuel).toHaveBeenCalledWith(1, expect.objectContaining({ liters: '47.300', price: '29284' }));
+    expect(api.addFuel).toHaveBeenCalledWith(1, {
+      eventDate: expect.any(String),
+      odometerKm: 0,
+      liters: 47.3,
+      price: 29_284,
+      fullTank: false,
+      remark: 'Shell',
+    });
     resolve?.();
     await waitFor(() => expect(panel('Fuel').getByRole('status')).toHaveTextContent('Fuel record saved.'));
     expect(screen.getByLabelText('Liters')).toHaveValue('');
@@ -197,11 +327,11 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('No records yet.');
     await user.click(screen.getByRole('tab', { name: 'Expenses' }));
-    await screen.findByLabelText('Amount (HUF)');
-    await user.type(screen.getByLabelText('Amount (HUF)'), '1000');
+    await screen.findByLabelText('Price (HUF)');
+    await user.type(screen.getByLabelText('Price (HUF)'), '1000');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
     expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('Unable to save');
-    expect(screen.getByLabelText('Amount (HUF)')).toHaveValue('1000');
+    expect(screen.getByLabelText('Price (HUF)')).toHaveValue('1000');
   });
 
   it('shows API failures and load fallbacks', async () => {
@@ -213,8 +343,8 @@ describe('App', () => {
 
     api.addExpense.mockRejectedValue(new api.ApiError('Amount was rejected.'));
     await user.click(screen.getByRole('tab', { name: 'Expenses' }));
-    await screen.findByLabelText('Amount (HUF)');
-    await user.type(screen.getByLabelText('Amount (HUF)'), '1000');
+    await screen.findByLabelText('Price (HUF)');
+    await user.type(screen.getByLabelText('Price (HUF)'), '1000');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
     expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('Amount was rejected.');
   });
@@ -231,7 +361,7 @@ describe('App', () => {
     await waitFor(() => expect(api.addAdBlue).toHaveBeenCalled());
     await user.click(screen.getByRole('tab', { name: 'Expenses' }));
     await screen.findByLabelText('Notes');
-    await user.type(screen.getByLabelText('Amount (HUF)'), '1000');
+    await user.type(screen.getByLabelText('Price (HUF)'), '1000');
     await user.type(screen.getByLabelText('Notes'), 'Service');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
     await waitFor(() => expect(api.addExpense).toHaveBeenCalled());
@@ -244,8 +374,8 @@ describe('App', () => {
         id: 8,
         eventDate: '2026-09-18',
         odometerKm: 123,
-        liters: '12.300',
-        price: '4567',
+        liters: 12.3,
+        price: 4567,
         fullTank: false,
         remark: 'Station',
       },
@@ -257,7 +387,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Edit Fuel record 8' }));
     expect(panel('Fuel').getByRole('group')).toHaveTextContent('Edit fuel record');
     expect(screen.getByLabelText('Odometer (km)')).toHaveValue(123);
-    expect(screen.getByLabelText('Liters')).toHaveValue('12.300');
+    expect(screen.getByLabelText('Liters')).toHaveValue('12.3');
     expect(screen.getByLabelText('Total price (HUF)')).toHaveValue('4567');
     expect(screen.getByLabelText('Full tank')).not.toBeChecked();
     expect(screen.getByLabelText('Remark')).toHaveValue('Station');
@@ -265,7 +395,14 @@ describe('App', () => {
     await user.type(screen.getByLabelText('Remark'), 'Updated');
     await user.click(screen.getByRole('button', { name: 'Update record' }));
     await waitFor(() =>
-      expect(api.updateFuel).toHaveBeenCalledWith(1, 8, expect.objectContaining({ remark: 'Updated' })),
+      expect(api.updateFuel).toHaveBeenCalledWith(1, 8, {
+        eventDate: '2026-09-18',
+        odometerKm: 123,
+        liters: 12.3,
+        price: 4567,
+        fullTank: false,
+        remark: 'Updated',
+      }),
     );
     expect(await panel('Fuel').findByRole('status')).toHaveTextContent('Fuel record updated.');
     expect(screen.getByRole('button', { name: 'Save record' })).toBeInTheDocument();
@@ -279,7 +416,7 @@ describe('App', () => {
 
   it('cancels edits and leaves the row untouched when deletion is declined', async () => {
     defaults();
-    api.getExpenses.mockResolvedValue([{ id: 3, eventDate: '2026-09-18', amount: '1000', notes: null }]);
+    api.getExpenses.mockResolvedValue([{ id: 3, eventDate: '2026-09-18', price: 1000, notes: null }]);
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     const user = userEvent.setup();
     render(<App />);
@@ -298,9 +435,9 @@ describe('App', () => {
   it('maps AdBlue and expense records into their existing edit forms', async () => {
     defaults();
     api.getAdBlue.mockResolvedValue([
-      { id: 2, eventDate: '2026-09-17', odometerKm: 456, liters: '3.400', price: '789', createdAt: '' },
+      { id: 2, eventDate: '2026-09-17', odometerKm: 456, liters: 3.4, price: 789, createdAt: '' },
     ]);
-    api.getExpenses.mockResolvedValue([{ id: 4, eventDate: '2026-09-16', amount: '1200', notes: null, createdAt: '' }]);
+    api.getExpenses.mockResolvedValue([{ id: 4, eventDate: '2026-09-16', price: 1200, notes: null, createdAt: '' }]);
     const user = userEvent.setup();
     render(<App />);
 
@@ -308,22 +445,26 @@ describe('App', () => {
     await user.click(await screen.findByRole('button', { name: 'Edit AdBlue record 2' }));
     expect(screen.getAllByLabelText('Date').at(-1)).toHaveValue('2026-09-17');
     expect(screen.getAllByLabelText('Odometer (km)').at(-1)).toHaveValue(456);
-    expect(screen.getAllByLabelText('Liters').at(-1)).toHaveValue('3.400');
+    expect(screen.getAllByLabelText('Liters').at(-1)).toHaveValue('3.4');
     expect(screen.getAllByLabelText('Total price (HUF)').at(-1)).toHaveValue('789');
     await user.click(screen.getByRole('button', { name: 'Update record' }));
     await waitFor(() =>
-      expect(api.updateAdBlue).toHaveBeenCalledWith(1, 2, expect.objectContaining({ liters: '3.400' })),
+      expect(api.updateAdBlue).toHaveBeenCalledWith(
+        1,
+        2,
+        expect.objectContaining({ liters: 3.4, price: 789, odometerKm: 456 }),
+      ),
     );
 
     await user.click(screen.getByRole('tab', { name: 'Expenses' }));
     await user.click(await screen.findByRole('button', { name: 'Edit Expenses record 4' }));
     expect(screen.getByLabelText('Notes')).toHaveValue('');
-    expect(screen.getByLabelText('Amount (HUF)')).toHaveValue('1200');
+    expect(screen.getByLabelText('Price (HUF)')).toHaveValue('1200');
     api.updateExpense.mockRejectedValueOnce(new api.ApiError('Update rejected.'));
     await user.click(screen.getByRole('button', { name: 'Update record' }));
     expect(await panel('Expenses').findByRole('alert')).toHaveTextContent('Update rejected.');
     expect(screen.getByRole('button', { name: 'Update record' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Amount (HUF)')).toHaveValue('1200');
+    expect(screen.getByLabelText('Price (HUF)')).toHaveValue('1200');
   });
   it('lists cars in a labelled selector and loads the first car by default', async () => {
     defaults();
@@ -362,13 +503,13 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('No records yet.');
     await user.click(screen.getByRole('tab', { name: 'Expenses' }));
-    await screen.findByLabelText('Amount (HUF)');
+    await screen.findByLabelText('Price (HUF)');
     await user.selectOptions(screen.getByLabelText('Car'), 'Polo');
     await waitFor(() => expect(api.getExpenses).toHaveBeenCalledWith(2));
     expect(screen.getByRole('tab', { name: 'Expenses' })).toHaveAttribute('aria-selected', 'true');
-    await user.type(screen.getByLabelText('Amount (HUF)'), '1000');
+    await user.type(screen.getByLabelText('Price (HUF)'), '1000');
     await user.click(screen.getByRole('button', { name: 'Save record' }));
-    await waitFor(() => expect(api.addExpense).toHaveBeenCalledWith(2, expect.objectContaining({ amount: '1000' })));
+    await waitFor(() => expect(api.addExpense).toHaveBeenCalledWith(2, expect.objectContaining({ price: 1000 })));
   });
   it('resets half-filled forms and edits in progress when the car changes', async () => {
     defaults();
@@ -536,6 +677,29 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Add car' }));
     expect(await screen.findByText('Enter a car name.')).toBeInTheDocument();
     expect(api.addCar).not.toHaveBeenCalled();
+  });
+  it('sends the trimmed name when adding a car', async () => {
+    defaults();
+    api.addCar.mockResolvedValue({ id: 3, name: 'Astra', createdAt: '' });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'Cars' }));
+    await user.type(screen.getByLabelText('Name'), '  Astra  ');
+    await user.click(screen.getByRole('button', { name: 'Add car' }));
+    expect(api.addCar).toHaveBeenCalledWith({ name: 'Astra' });
+  });
+  it('rejects a whitespace-only rename without a request', async () => {
+    defaults();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'Cars' }));
+    await user.clear(screen.getByLabelText('New name'));
+    await user.type(screen.getByLabelText('New name'), '   ');
+    await user.click(screen.getByRole('button', { name: 'Rename car' }));
+    expect(await screen.findByText('Enter a car name.')).toBeInTheDocument();
+    expect(api.renameCar).not.toHaveBeenCalled();
   });
   it('renames the active car without reloading its records', async () => {
     defaults();
