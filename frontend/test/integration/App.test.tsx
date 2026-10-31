@@ -808,6 +808,36 @@ describe('App', () => {
       expect(panel('Fuel').getByRole('button', { name: redoName })).toBeEnabled();
     });
 
+    it('reloads a remounted Panel when a change started before a car switch lands', async () => {
+      defaults();
+      let remark = 'Original';
+      api.getFuel.mockImplementation((id: number) => Promise.resolve(id === 1 ? [fuelRow(8, remark)] : []));
+      const user = userEvent.setup();
+      render(<App />);
+      await editRemark(user, 8, 'Edited');
+      remark = 'Edited';
+      const pendingUndo = deferred<unknown>();
+      api.updateFuel.mockReturnValue(pendingUndo.promise);
+      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
+      await waitFor(() => expect(api.updateFuel).toHaveBeenCalledTimes(2));
+      await user.selectOptions(screen.getByLabelText('Car'), 'Polo');
+      await screen.findByText('No records yet.');
+      await user.selectOptions(screen.getByLabelText('Car'), 'Golf');
+      await screen.findByText('Edited');
+      // Only an undo or redo is running, so the submit button does not claim a save is.
+      expect(panel('Fuel').getByRole('button', { name: 'Save record' })).toBeDisabled();
+
+      remark = 'Original';
+      const fuelCalls = api.getFuel.mock.calls.length;
+      await act(async () => {
+        pendingUndo.resolve({});
+        await pendingUndo.promise;
+      });
+      await screen.findByText('Original');
+      expect(api.getFuel).toHaveBeenCalledTimes(fuelCalls + 1);
+      expect(screen.queryByText('Undid edit of Fuel record.')).not.toBeInTheDocument();
+    });
+
     it('cancels the edit form when the loaded record is undone, but not another record', async () => {
       defaults();
       api.getFuel.mockResolvedValue([fuelRow(8, 'Original'), fuelRow(9, 'Other')]);

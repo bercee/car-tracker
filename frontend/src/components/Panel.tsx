@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react';
 
 import { ApiError } from '../api';
+import { useForeignChange } from '../useForeignChange';
 import { useIsMounted } from '../useIsMounted';
 import type { RecordAction, UndoHistory } from '../undoHistory';
 import { StatusMessage } from './StatusMessage';
@@ -81,6 +82,8 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
   // The Undo history outlives this Panel, so a change started before a remount still disables the controls here.
   useSyncExternalStore(undoHistory.subscribe, undoHistory.snapshot);
   const pending = undoHistory.pending;
+  // Whether this Panel's own save, update, delete, undo or redo is in flight, as opposed to one started before a remount.
+  const [saving, setSaving] = useState(false);
   const refresh = async () => {
     setLoading(true);
     try {
@@ -108,6 +111,9 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
       cancelled = true;
     };
   }, [load]);
+
+  // A change started before a remount lands without this Panel's handlers, so the list is reloaded here.
+  const markStarted = useForeignChange(pending, () => void refresh());
 
   const label = (kind: 'add' | 'edit' | 'delete') => `${kind} of ${title} record`;
   const addAction = (id: number, after: T): RecordAction => ({
@@ -155,6 +161,8 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
     const wasEditing = editing !== undefined;
     setError(undefined);
     setMessage(undefined);
+    markStarted(true);
+    setSaving(true);
     try {
       const after = value;
       await undoHistory.run(async () => {
@@ -175,12 +183,15 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
       if (isMounted()) {
         setError(cause instanceof ApiError ? cause.message : `Unable to ${wasEditing ? 'update' : 'save'} the record.`);
       }
+    } finally {
+      if (isMounted()) setSaving(false);
     }
   };
   const applyUndoRedo = async (verb: Verb) => {
     const what = verbs[verb].next(undoHistory)?.label;
     setError(undefined);
     setMessage(undefined);
+    markStarted(!undoHistory.pending && what !== undefined);
     try {
       // A network failure keeps the Record action for a retry; any other API failure drops it.
       const discard = (cause: unknown) => cause instanceof ApiError && cause.kind !== 'network';
@@ -222,6 +233,7 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
   const onDelete = async (record: R) => {
     setError(undefined);
     setMessage(undefined);
+    markStarted(true);
     try {
       await undoHistory.run(async () => {
         await remove(record.id);
@@ -249,7 +261,7 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
           </legend>
           {children(value, setValue, pending)}
           <button type="submit">
-            {pending
+            {saving
               ? editingId === undefined
                 ? 'Saving…'
                 : 'Updating…'
