@@ -26,6 +26,7 @@ const api = vi.hoisted(() => {
 });
 vi.mock('../../src/api', () => api);
 import { App } from '../../src/App';
+import { formatMoney } from '../../src/format';
 
 const cars = [
   { id: 1, name: 'Golf', createdAt: '' },
@@ -127,7 +128,7 @@ describe('App', () => {
     await screen.findAllByText('2.000 L');
     await user.click(screen.getByRole('tab', { name: 'Expenses' }));
     await screen.findByText('Service');
-    expect(screen.getByText(/^1.?000.Ft$/)).toBeInTheDocument();
+    expect(screen.getByText(formatMoney(1000).replace(/\s/g, ' '))).toBeInTheDocument();
     expect(screen.getAllByText('—')).toHaveLength(2);
     await user.click(screen.getByRole('tab', { name: 'Fuel' }));
     expect(api.getFuel).toHaveBeenCalledTimes(1);
