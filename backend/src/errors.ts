@@ -1,17 +1,9 @@
 import type { ErrorRequestHandler } from 'express';
 import type { ErrorCode, ErrorEnvelope } from '@car-tracker/contracts';
-import pg from 'pg';
 
 import { ValidationError } from './validation/common.js';
 
 export type { ErrorCode, ErrorEnvelope } from '@car-tracker/contracts';
-
-export class DatabaseUnavailableError extends Error {
-  constructor(message: string = 'Database is unavailable') {
-    super(message);
-    this.name = 'DatabaseUnavailableError';
-  }
-}
 
 export class HttpError extends Error {
   readonly status: number;
@@ -27,24 +19,40 @@ export class HttpError extends Error {
   }
 }
 
-function isDatabaseUnavailableError(error: unknown): boolean {
-  // Check for DatabaseUnavailableError directly
-  if (error instanceof DatabaseUnavailableError) {
+// Socket errors, plus the SQLSTATEs Postgres sends while refusing or ending connections (08xxx is matched by prefix).
+const connectionFailureCodes = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ETIMEDOUT',
+  'EPIPE',
+  '53300',
+  '57P01',
+  '57P02',
+  '57P03',
+]);
+
+// Drizzle puts the driver error on `cause`; Node reports dual-stack connect failures as an AggregateError.
+// pg's "Connection terminated" errors carry no code, so they are matched by message.
+function isDatabaseUnavailableError(error: unknown, depth = 0): boolean {
+  if (!(error instanceof Error) || depth > 5) {
+    return false;
+  }
+
+  const code: unknown = Reflect.get(error, 'code');
+  if (typeof code === 'string' && (connectionFailureCodes.has(code) || code.startsWith('08'))) {
     return true;
   }
 
-  // Check for DrizzleQueryError with a database connection error in its cause
-  // Drizzle wraps pg errors in DrizzleQueryError with the pg error as `cause`
-  if (error !== null && typeof error === 'object') {
-    const cause = (error as { cause?: unknown }).cause;
-    if (cause instanceof pg.DatabaseError) {
-      // ECONNREFUSED means connection refused - database is not running
-      // Other connection errors: EHOSTUNREACH, ENOTFOUND, etc.
-      return cause.code === 'ECONNREFUSED' || cause.code === 'EHOSTUNREACH' || cause.code === 'ENOTFOUND';
-    }
+  if (error.message.startsWith('Connection terminated')) {
+    return true;
   }
 
-  return false;
+  const nested: unknown[] = error instanceof AggregateError ? error.errors : [];
+  return [error.cause, ...nested].some((inner) => isDatabaseUnavailableError(inner, depth + 1));
 }
 
 export function toHttpError(error: unknown): HttpError {

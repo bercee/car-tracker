@@ -2,7 +2,6 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 
 import type { DatabaseConfig } from '../config.js';
-import { DatabaseUnavailableError } from '../errors.js';
 
 export interface PostgresOptions {
   healthTimeoutMs?: number;
@@ -42,10 +41,7 @@ export function createPostgresConnection(
       // The race bounds connecting and querying together, so an unreachable host cannot hang the probe.
       let timer: NodeJS.Timeout | undefined;
       const timeout = new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(
-          () => reject(new DatabaseUnavailableError('Database health check timed out')),
-          healthTimeoutMs,
-        );
+        timer = setTimeout(() => reject(new Error('Health check timed out')), healthTimeoutMs);
       });
       try {
         await Promise.race([pool.query('SELECT 1'), timeout]);

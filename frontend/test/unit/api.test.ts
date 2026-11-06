@@ -5,6 +5,7 @@ import {
   addCar,
   addExpense,
   addFuel,
+  checkHealth,
   deleteAdBlue,
   deleteExpense,
   deleteFuel,
@@ -117,5 +118,23 @@ describe('api client', () => {
     await expect(getFuel(1)).rejects.toEqual(
       new ApiError('The request could not be completed.', undefined, 'rejected'),
     );
+  });
+
+  it('classifies a DATABASE_UNAVAILABLE response, including the health body', async () => {
+    const error = { code: 'DATABASE_UNAVAILABLE', message: 'Database is unavailable' };
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve(new Response(JSON.stringify({ status: 'unavailable', error }), { status: 503 })),
+        ),
+    );
+
+    await expect(checkHealth()).rejects.toMatchObject({
+      message: 'Database is unavailable',
+      kind: 'database-unavailable',
+    });
+    await expect(getFuel(1)).rejects.toMatchObject({ kind: 'database-unavailable' });
   });
 });

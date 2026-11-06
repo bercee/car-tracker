@@ -34,11 +34,12 @@ export function App() {
   const [loadingCars, setLoadingCars] = useState(true);
   const [databaseUnavailable, setDatabaseUnavailable] = useState(false);
   const [carsError, setCarsError] = useState<string>();
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
 
-    // Check database health on startup
+    // Runs alongside getCars because the probe is time-limited: getCars can hang on an unreachable host.
     void checkHealth().catch((error: unknown) => {
       if (!cancelled && error instanceof ApiError && error.kind === 'database-unavailable') {
         setDatabaseUnavailable(true);
@@ -70,8 +71,14 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
+  const retryLoad = () => {
+    setDatabaseUnavailable(false);
+    setCarsError(undefined);
+    setLoadingCars(true);
+    setLoadAttempt((attempt) => attempt + 1);
+  };
   const selectCar = (id: number) => {
     setCarId(id);
     storeCarId(id);
@@ -117,6 +124,9 @@ export function App() {
             database is available.
           </p>
           <p>Please check that the database server is running and accessible.</p>
+          <button type="button" onClick={retryLoad}>
+            Try again
+          </button>
         </div>
       </main>
     );

@@ -53,4 +53,30 @@ describe('HTTP-safe errors', () => {
       error: { code: 'INTERNAL_ERROR', message: 'An internal error occurred' },
     });
   });
+
+  const refused = () => Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:5432'), { code: 'ECONNREFUSED' });
+
+  it.each([
+    ['a bare socket error', refused()],
+    ['a socket error wrapped by Drizzle', new Error('Failed query: select 1', { cause: refused() })],
+    ['an AggregateError from a dual-stack connect', new AggregateError([refused()], 'connect failed')],
+    ['a code-less dropped connection', new Error('Connection terminated unexpectedly')],
+    ['a server-side shutdown', Object.assign(new Error('terminating connection'), { code: '57P01' })],
+    ['a connection-exception SQLSTATE', Object.assign(new Error('connection failure'), { code: '08006' })],
+  ])('maps %s to DATABASE_UNAVAILABLE', (_label, source) => {
+    expect(toHttpError(source)).toMatchObject({
+      status: 503,
+      code: 'DATABASE_UNAVAILABLE',
+      message: 'Database is unavailable',
+    });
+  });
+
+  it('does not treat a query error as an outage', () => {
+    const syntaxError = Object.assign(new Error('syntax error'), { code: '42601' });
+
+    expect(toHttpError(new Error('Failed query', { cause: syntaxError }))).toMatchObject({
+      status: 500,
+      code: 'INTERNAL_ERROR',
+    });
+  });
 });

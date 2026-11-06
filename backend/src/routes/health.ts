@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { DatabaseUnavailableError } from '../errors.js';
+import { HttpError, toErrorEnvelope } from '../errors.js';
 
 export type HealthCheck = () => Promise<void>;
 
@@ -11,17 +11,10 @@ export function createHealthRouter(checkHealth: HealthCheck): Router {
     try {
       await checkHealth();
       response.status(200).json({ status: 'ok' });
-    } catch (error) {
-      if (error instanceof DatabaseUnavailableError) {
-        response.status(503).json({
-          error: {
-            code: 'DATABASE_UNAVAILABLE',
-            message: error.message,
-          },
-        });
-      } else {
-        response.status(503).json({ status: 'unavailable' });
-      }
+    } catch {
+      // The probe only runs SELECT 1, so any failure means the database is unavailable.
+      const error = new HttpError(503, 'DATABASE_UNAVAILABLE', 'Database is unavailable');
+      response.status(error.status).json({ status: 'unavailable', ...toErrorEnvelope(error) });
     }
   });
 
