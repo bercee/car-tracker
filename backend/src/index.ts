@@ -11,6 +11,9 @@ try {
   const server = app.listen(config.port, config.host);
   server.once('listening', () => {
     console.log(`Car Tracker backend listening on http://${config.host}:${config.port}`);
+    postgres.checkHealth().catch((error: unknown) => {
+      console.error('DATABASE UNAVAILABLE: the backend keeps running and reconnects once it is back.', error);
+    });
   });
   server.once('error', (error: Error) => {
     console.error('Failed to start Car Tracker backend', error);

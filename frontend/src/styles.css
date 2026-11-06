@@ -92,6 +92,23 @@ textarea {
   color: #b42318;
   font-weight: 600;
 }
+.database-warning {
+  background: #fef2f2;
+  border: 2px solid #f87171;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+.database-warning strong {
+  color: #b42318;
+  font-size: 1.2rem;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+.database-warning p {
+  margin: 0.5rem 0;
+  color: #782924;
+}
 .table-wrap {
   overflow-x: auto;
 }

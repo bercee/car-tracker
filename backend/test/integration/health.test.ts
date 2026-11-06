@@ -35,6 +35,15 @@ describe('GET /api/health against PostgreSQL', () => {
 
     const down = await request(app).get('/api/health');
     expect(down.status).toBe(503);
-    expect(down.body).toEqual({ status: 'unavailable' });
+    expect(down.body).toEqual({
+      status: 'unavailable',
+      error: { code: 'DATABASE_UNAVAILABLE', message: 'Database is unavailable' },
+    });
+
+    const cars = await request(app).get('/api/cars');
+    expect(cars.status).toBe(503);
+    expect(cars.body).toEqual({
+      error: { code: 'DATABASE_UNAVAILABLE', message: 'Database is unavailable' },
+    });
   }, 60_000);
 });

@@ -46,7 +46,8 @@ export interface ExpenseRecord extends ExpenseRequest {
   notes: string | null;
 }
 
-export type ErrorCode = 'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFLICT' | 'UNSUPPORTED_MEDIA_TYPE' | 'INTERNAL_ERROR';
+export type ErrorCode =
+  'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFLICT' | 'UNSUPPORTED_MEDIA_TYPE' | 'INTERNAL_ERROR' | 'DATABASE_UNAVAILABLE';
 
 export interface ErrorEnvelope {
   error: {
