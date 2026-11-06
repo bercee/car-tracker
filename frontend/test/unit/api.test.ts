@@ -80,6 +80,29 @@ describe('api client', () => {
     );
   });
 
+  it('classifies failures as network, not found or rejected', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    await expect(getFuel(1)).rejects.toMatchObject({
+      kind: 'network',
+      message: 'Unable to reach the server. Please try again.',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not JSON', { status: 200 })));
+    await expect(getFuel(1)).rejects.toMatchObject({
+      kind: 'network',
+      message: 'The server returned an invalid response.',
+    });
+
+    const envelope = JSON.stringify({ error: { message: 'Gone', field: 'id' } });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(envelope, { status: 404 })));
+    await expect(getFuel(1)).rejects.toMatchObject({ kind: 'not-found', message: 'Gone', field: 'id' });
+
+    for (const status of [400, 409]) {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(envelope, { status })));
+      await expect(getFuel(1)).rejects.toMatchObject({ kind: 'rejected', message: 'Gone', field: 'id' });
+    }
+  });
+
   it('uses member paths and methods, and accepts empty 204 delete responses', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 4 }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
