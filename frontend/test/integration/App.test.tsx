@@ -724,29 +724,29 @@ describe('App', () => {
       );
     });
 
-    it('keeps the Undo history across car and section switches', async () => {
+    it('keeps the Undo history across section switches but drops it when the car changes', async () => {
       defaults();
       api.getFuel.mockResolvedValue([fuelRow(8, 'Original')]);
       const user = userEvent.setup();
       render(<App />);
       await editRemark(user, 8, 'Edited');
 
-      await user.selectOptions(screen.getByLabelText('Car'), 'Polo');
-      await waitFor(() => expect(api.getFuel).toHaveBeenCalledWith(2));
-      expect(await panel('Fuel').findByRole('button', { name: 'Undo' })).toBeDisabled();
-      await user.selectOptions(screen.getByLabelText('Car'), 'Golf');
-      await user.click(await panel('Fuel').findByRole('button', { name: undoName }));
+      await user.click(screen.getByRole('tab', { name: 'Cars' }));
+      await user.click(screen.getByRole('tab', { name: 'Fuel' }));
+      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
       await waitFor(() =>
         expect(api.updateFuel).toHaveBeenLastCalledWith(1, 8, expect.objectContaining({ remark: 'Original' })),
       );
       await panel('Fuel').findByText('Undid edit of Fuel record.');
 
-      await user.click(screen.getByRole('tab', { name: 'Cars' }));
-      await user.click(screen.getByRole('tab', { name: 'Fuel' }));
-      await user.click(panel('Fuel').getByRole('button', { name: redoName }));
-      await waitFor(() =>
-        expect(api.updateFuel).toHaveBeenLastCalledWith(1, 8, expect.objectContaining({ remark: 'Edited' })),
-      );
+      // A redo is on offer now; switching the Active car drops it along with the rest of the Undo history.
+      expect(panel('Fuel').getByRole('button', { name: redoName })).toBeEnabled();
+      await user.selectOptions(screen.getByLabelText('Car'), 'Polo');
+      await waitFor(() => expect(api.getFuel).toHaveBeenCalledWith(2));
+      await user.selectOptions(screen.getByLabelText('Car'), 'Golf');
+      await screen.findByRole('button', { name: 'Edit Fuel record 8' });
+      expect(panel('Fuel').getByRole('button', { name: 'Undo' })).toBeDisabled();
+      expect(panel('Fuel').getByRole('button', { name: 'Redo' })).toBeDisabled();
     });
 
     it('keeps a separate Undo history per panel', async () => {
@@ -818,64 +818,6 @@ describe('App', () => {
       });
       expect(screen.queryByText('Undid edit of Fuel record.')).not.toBeInTheDocument();
       expect(api.getFuel).toHaveBeenCalledTimes(fuelCalls);
-    });
-
-    it('keeps Undo disabled on a remounted Panel until an undo started before a car switch lands', async () => {
-      defaults();
-      api.getFuel.mockImplementation((id: number) => Promise.resolve(id === 1 ? [fuelRow(8, 'Original')] : []));
-      const user = userEvent.setup();
-      render(<App />);
-      await editRemark(user, 8, 'Edited');
-      const pendingUndo = deferred<unknown>();
-      api.updateFuel.mockReturnValue(pendingUndo.promise);
-      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
-      await waitFor(() => expect(api.updateFuel).toHaveBeenCalledTimes(2));
-      await user.selectOptions(screen.getByLabelText('Car'), 'Polo');
-      await screen.findByText('No records yet.');
-      await user.selectOptions(screen.getByLabelText('Car'), 'Golf');
-      await screen.findByRole('button', { name: 'Edit Fuel record 8' });
-
-      expect(panel('Fuel').getByRole('button', { name: undoName })).toBeDisabled();
-      await user.click(document.body);
-      await user.keyboard('{Control>}z{/Control}');
-      expect(api.updateFuel).toHaveBeenCalledTimes(2);
-
-      await act(async () => {
-        pendingUndo.resolve({});
-        await pendingUndo.promise;
-      });
-      expect(panel('Fuel').getByRole('button', { name: 'Undo' })).toBeDisabled();
-      expect(panel('Fuel').getByRole('button', { name: redoName })).toBeEnabled();
-    });
-
-    it('reloads a remounted Panel when a change started before a car switch lands', async () => {
-      defaults();
-      let remark = 'Original';
-      api.getFuel.mockImplementation((id: number) => Promise.resolve(id === 1 ? [fuelRow(8, remark)] : []));
-      const user = userEvent.setup();
-      render(<App />);
-      await editRemark(user, 8, 'Edited');
-      remark = 'Edited';
-      const pendingUndo = deferred<unknown>();
-      api.updateFuel.mockReturnValue(pendingUndo.promise);
-      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
-      await waitFor(() => expect(api.updateFuel).toHaveBeenCalledTimes(2));
-      await user.selectOptions(screen.getByLabelText('Car'), 'Polo');
-      await screen.findByText('No records yet.');
-      await user.selectOptions(screen.getByLabelText('Car'), 'Golf');
-      await screen.findByText('Edited');
-      // Only an undo or redo is running, so the submit button does not claim a save is.
-      expect(panel('Fuel').getByRole('button', { name: 'Save record' })).toBeDisabled();
-
-      remark = 'Original';
-      const fuelCalls = api.getFuel.mock.calls.length;
-      await act(async () => {
-        pendingUndo.resolve({});
-        await pendingUndo.promise;
-      });
-      await screen.findByText('Original');
-      expect(api.getFuel).toHaveBeenCalledTimes(fuelCalls + 1);
-      expect(screen.queryByText('Undid edit of Fuel record.')).not.toBeInTheDocument();
     });
 
     it('cancels the edit form when the loaded record is undone, but not another record', async () => {
@@ -1073,6 +1015,22 @@ describe('App', () => {
       api.updateFuel.mockRejectedValueOnce(new api.ApiError('Unable to reach the server.', undefined, 'network'));
       await user.click(panel('Fuel').getByRole('button', { name: undoName }));
       expect(await panel('Fuel').findByRole('alert')).toHaveTextContent('Unable to reach the server.');
+      expect(panel('Fuel').getByRole('button', { name: undoName })).toBeEnabled();
+
+      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
+      await waitFor(() =>
+        expect(api.updateFuel).toHaveBeenLastCalledWith(1, 8, expect.objectContaining({ remark: 'Original' })),
+      );
+      expect(await panel('Fuel').findByRole('status')).toHaveTextContent('Undid edit of Fuel record.');
+    });
+
+    it('keeps the Record action after a database-unavailable failure and applies it on retry', async () => {
+      defaults();
+      const user = userEvent.setup();
+      await twoEdits(user);
+      api.updateFuel.mockRejectedValueOnce(unavailable());
+      await user.click(panel('Fuel').getByRole('button', { name: undoName }));
+      expect(await panel('Fuel').findByRole('alert')).toHaveTextContent('Database is unavailable');
       expect(panel('Fuel').getByRole('button', { name: undoName })).toBeEnabled();
 
       await user.click(panel('Fuel').getByRole('button', { name: undoName }));

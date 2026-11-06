@@ -43,5 +43,5 @@ A single add, edit or delete of a Record made by the user; the unit that can be 
 _Avoid_: Command, operation, change
 
 **Undo history**:
-The ordered Record actions of one Car in one Panel, kept only until the page reloads.
+The ordered Record actions made in one Panel for the Active car, kept only until the Active car changes or the page reloads.
 _Avoid_: Undo stack, history

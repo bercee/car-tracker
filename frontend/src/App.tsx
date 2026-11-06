@@ -8,7 +8,6 @@ import { ExpensesPanel } from './components/ExpensesPanel';
 import { FuelPanel } from './components/FuelPanel';
 import type { RecordPanelProps } from './components/Panel';
 import { StatusMessage } from './components/StatusMessage';
-import { UndoHistory } from './undoHistory';
 
 enum Section {
   Fuel = 'Fuel',
@@ -33,17 +32,6 @@ const byName = (a: Car, b: Car) => {
 };
 
 export function App() {
-  // Undo histories outlive the Panels, which remount on every Car switch.
-  const [undoHistories] = useState(() => new Map<string, UndoHistory>());
-  const undoHistoryFor = (car: number, section: Section) => {
-    const key = `${car}:${section}`;
-    let undoHistory = undoHistories.get(key);
-    if (!undoHistory) {
-      undoHistory = new UndoHistory();
-      undoHistories.set(key, undoHistory);
-    }
-    return undoHistory;
-  };
   const [activeSection, setActiveSection] = useState<Section>(Section.Fuel);
   const [visitedSections, setVisitedSections] = useState<Set<Section>>(() => new Set([Section.Fuel]));
 
@@ -194,12 +182,7 @@ export function App() {
           ([section, RecordPanel]) =>
             visitedSections.has(section) && (
               <div key={section} hidden={activeSection !== section}>
-                <RecordPanel
-                  key={carId}
-                  carId={carId}
-                  undoHistory={undoHistoryFor(carId, section)}
-                  visible={activeSection === section}
-                />
+                <RecordPanel key={carId} carId={carId} visible={activeSection === section} />
               </div>
             ),
         )}

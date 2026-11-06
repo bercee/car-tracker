@@ -1,4 +1,4 @@
-// One Undo history: the Record actions of a single Car in a single Panel.
+// One Undo history: the Record actions of a single Panel for the Active car.
 // Framework-independent; Record actions carry their own effects so the module never touches the API.
 //
 // An effect receives the id the Record has right now. An effect that creates the Record
@@ -17,28 +17,11 @@ export interface RecordAction {
 export class UndoHistory {
   private done: RecordAction[] = [];
   private undone: RecordAction[] = [];
-  private listeners = new Set<() => void>();
-  private version = 0;
-  private inFlight = false;
-
-  // Arrow functions, so React's useSyncExternalStore can take them unbound.
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener);
-    return () => void this.listeners.delete(listener);
-  };
-
-  /** Changes whenever anything the history reports changes. */
-  snapshot = () => this.version;
-
-  /** True while a change to this history's Records is in flight; undo and redo do nothing meanwhile. */
-  get pending() {
-    return this.inFlight;
-  }
+  private stepping = false;
 
   record(action: RecordAction) {
     this.done.push(action);
     this.undone.length = 0;
-    this.notify();
   }
 
   nextUndo(): RecordAction | undefined {
@@ -49,19 +32,9 @@ export class UndoHistory {
     return this.undone.at(-1);
   }
 
-  /** Runs a change with the history marked pending, so no undo or redo races it, even across Panel remounts. */
-  async run<T>(change: () => Promise<T>) {
-    this.setInFlight(true);
-    try {
-      return await change();
-    } finally {
-      this.setInFlight(false);
-    }
-  }
-
-  // Resolves to the Record action that was applied, or undefined when there is nothing to do or a
-  // change is pending. A failing effect rejects. The Record action stays where it was (so the user
-  // can retry) unless `shouldDiscard` says the failure is final, in which case only it is dropped.
+  // Resolves to the Record action that was applied, or undefined when there is nothing to do or an
+  // undo or redo is already running. A failing effect rejects. The Record action stays where it was
+  // (so the user can retry) unless `shouldDiscard` says the failure is final, in which case only it is dropped.
   undo(shouldDiscard: (cause: unknown) => boolean = () => false) {
     return this.step(this.done, this.undone, 'reverse', shouldDiscard);
   }
@@ -78,8 +51,9 @@ export class UndoHistory {
     shouldDiscard: (cause: unknown) => boolean,
   ) {
     const action = from.at(-1);
-    if (!action || this.inFlight) return undefined;
-    await this.run(async () => {
+    if (!action || this.stepping) return undefined;
+    this.stepping = true;
+    try {
       try {
         this.remap(action.recordId, await action[effect](action.recordId));
       } catch (cause) {
@@ -88,18 +62,10 @@ export class UndoHistory {
       }
       from.pop();
       to.push(action);
-    });
+    } finally {
+      this.stepping = false;
+    }
     return action;
-  }
-
-  private setInFlight(inFlight: boolean) {
-    this.inFlight = inFlight;
-    this.notify();
-  }
-
-  private notify() {
-    this.version++;
-    for (const listener of this.listeners) listener();
   }
 
   private remap(oldId: number, created: void | number) {

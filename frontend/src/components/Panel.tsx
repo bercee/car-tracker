@@ -1,9 +1,8 @@
-import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 
-import { ApiError } from '../api';
-import { useForeignChange } from '../useForeignChange';
+import { ApiError, type ApiErrorKind } from '../api';
 import { useIsMounted } from '../useIsMounted';
-import type { RecordAction, UndoHistory } from '../undoHistory';
+import { UndoHistory, type RecordAction } from '../undoHistory';
 import { StatusMessage } from './StatusMessage';
 
 const isEditable = (target: EventTarget | null) =>
@@ -27,10 +26,13 @@ type Verb = keyof typeof verbs;
 
 const describe = (action: RecordAction) => `${action.label} from ${action.eventDate}`;
 
+// Failures that can go away by themselves keep the Record action for a retry; any other API failure drops it.
+const transientFailures: ApiErrorKind[] = ['network', 'database-unavailable'];
+const isFinalFailure = (cause: unknown) => cause instanceof ApiError && !transientFailures.includes(cause.kind);
+
 /** The props every Record type's Panel takes from the App. */
 export interface RecordPanelProps {
   carId: number;
-  undoHistory: UndoHistory;
   /** Whether this Panel's Section is the one on screen; only then do the shortcuts act. */
   visible: boolean;
 }
@@ -43,7 +45,6 @@ export interface PanelActions<R> {
 
 export interface PanelProps<T extends { eventDate: string }, R extends { id: number }> {
   title: string;
-  undoHistory: UndoHistory;
   visible: boolean;
   load: () => Promise<R[]>;
   submit: (value: T) => Promise<R>;
@@ -58,7 +59,6 @@ export interface PanelProps<T extends { eventDate: string }, R extends { id: num
 
 export function Panel<T extends { eventDate: string }, R extends { id: number }>({
   title,
-  undoHistory,
   visible,
   load,
   submit,
@@ -79,11 +79,21 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
   const [message, setMessage] = useState<string>();
   const [error, setError] = useState<string>();
   const isMounted = useIsMounted();
-  // The Undo history outlives this Panel, so a change started before a remount still disables the controls here.
-  useSyncExternalStore(undoHistory.subscribe, undoHistory.snapshot);
-  const pending = undoHistory.pending;
-  // Whether this Panel's own save, update, delete, undo or redo is in flight, as opposed to one started before a remount.
+  // This Panel's own Undo history. It lives and dies with the Panel, so switching the Active car drops it.
+  const [undoHistory] = useState(() => new UndoHistory());
+  // True while a save, update, delete, undo or redo is in flight. Every change to the Undo history happens inside
+  // `track`, and its final `setPending(false)` re-renders, so reading the Undo history during render is always current.
+  const [pending, setPending] = useState(false);
+  // Whether a save or update is in flight, so only the submit button says "Saving…" or "Updating…".
   const [saving, setSaving] = useState(false);
+  const track = async <V,>(change: () => Promise<V>) => {
+    setPending(true);
+    try {
+      return await change();
+    } finally {
+      if (isMounted()) setPending(false);
+    }
+  };
   const refresh = async () => {
     setLoading(true);
     try {
@@ -111,9 +121,6 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
       cancelled = true;
     };
   }, [load]);
-
-  // A change started before a remount lands without this Panel's handlers, so the list is reloaded here.
-  const markStarted = useForeignChange(pending, () => void refresh());
 
   const label = (kind: 'add' | 'edit' | 'delete') => `${kind} of ${title} record`;
   const addAction = (id: number, after: T): RecordAction => ({
@@ -161,11 +168,10 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
     const wasEditing = editing !== undefined;
     setError(undefined);
     setMessage(undefined);
-    markStarted(true);
     setSaving(true);
     try {
       const after = value;
-      await undoHistory.run(async () => {
+      await track(async () => {
         if (editing) {
           await update(editing.id, after);
           undoHistory.record(editAction(editing.id, editing.before, after));
@@ -191,11 +197,8 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
     const what = verbs[verb].next(undoHistory)?.label;
     setError(undefined);
     setMessage(undefined);
-    markStarted(!undoHistory.pending && what !== undefined);
     try {
-      // A network failure keeps the Record action for a retry; any other API failure drops it.
-      const discard = (cause: unknown) => cause instanceof ApiError && cause.kind !== 'network';
-      const action = await verbs[verb].apply(undoHistory, discard);
+      const action = await track(() => verbs[verb].apply(undoHistory, isFinalFailure));
       if (!isMounted() || !action) return;
       if (editingId === action.recordId) {
         setEditing(undefined);
@@ -212,7 +215,7 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
     }
   };
   const handleShortcut = (verb: Verb) => {
-    if (undoHistory.pending || verbs[verb].next(undoHistory) === undefined) return false;
+    if (pending || verbs[verb].next(undoHistory) === undefined) return false;
     void applyUndoRedo(verb);
     return true;
   };
@@ -233,9 +236,8 @@ export function Panel<T extends { eventDate: string }, R extends { id: number }>
   const onDelete = async (record: R) => {
     setError(undefined);
     setMessage(undefined);
-    markStarted(true);
     try {
-      await undoHistory.run(async () => {
+      await track(async () => {
         await remove(record.id);
         undoHistory.record(deleteAction(record.id, toFormValue(record)));
       });

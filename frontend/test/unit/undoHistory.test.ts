@@ -82,32 +82,20 @@ describe('Undo history', () => {
     expect(undoHistory.nextUndo()?.label).toBe('third');
   });
 
-  it('is pending while an undo runs, ignores a second one meanwhile and tells subscribers', async () => {
+  it('ignores a second undo or redo while one is running', async () => {
     const undoHistory = new UndoHistory();
     let finish!: () => void;
     const reverse = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
     undoHistory.record({ ...action(1, 'first'), reverse });
-    const listener = vi.fn();
-    const unsubscribe = undoHistory.subscribe(listener);
 
     const first = undoHistory.undo();
-    expect(undoHistory.pending).toBe(true);
-    expect(listener).toHaveBeenCalled();
     expect(await undoHistory.undo()).toBeUndefined();
     expect(await undoHistory.redo()).toBeUndefined();
     expect(reverse).toHaveBeenCalledTimes(1);
 
-    listener.mockClear();
     finish();
     expect((await first)?.recordId).toBe(1);
-    expect(undoHistory.pending).toBe(false);
     expect(undoHistory.nextRedo()?.label).toBe('first');
-    expect(listener).toHaveBeenCalled();
-
-    unsubscribe();
-    listener.mockClear();
-    undoHistory.record(action(2, 'second'));
-    expect(listener).not.toHaveBeenCalled();
   });
 
   it('keeps a Record action where it was when its effect fails', async () => {

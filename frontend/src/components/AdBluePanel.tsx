@@ -14,7 +14,7 @@ const columns: RecordTableColumn<AdBlueRecord>[] = [
   { header: 'Amount', render: (record) => formatMoney(record.price) },
 ];
 
-export function AdBluePanel({ carId, undoHistory, visible }: RecordPanelProps) {
+export function AdBluePanel({ carId, visible }: RecordPanelProps) {
   const load = useCallback(() => getAdBlue(carId), [carId]);
   const submit = useCallback((value: AdBlueRequest) => addAdBlue(carId, value), [carId]);
   const update = useCallback((id: number, value: AdBlueRequest) => updateAdBlue(carId, id, value), [carId]);
@@ -22,7 +22,6 @@ export function AdBluePanel({ carId, undoHistory, visible }: RecordPanelProps) {
   return (
     <Panel
       title="AdBlue"
-      undoHistory={undoHistory}
       visible={visible}
       load={load}
       submit={submit}
