@@ -1,9 +1,17 @@
 import type { ErrorRequestHandler } from 'express';
 import type { ErrorCode, ErrorEnvelope } from '@car-tracker/contracts';
+import pg from 'pg';
 
 import { ValidationError } from './validation/common.js';
 
 export type { ErrorCode, ErrorEnvelope } from '@car-tracker/contracts';
+
+export class DatabaseUnavailableError extends Error {
+  constructor(message: string = 'Database is unavailable') {
+    super(message);
+    this.name = 'DatabaseUnavailableError';
+  }
+}
 
 export class HttpError extends Error {
   readonly status: number;
@@ -19,9 +27,33 @@ export class HttpError extends Error {
   }
 }
 
+function isDatabaseUnavailableError(error: unknown): boolean {
+  // Check for DatabaseUnavailableError directly
+  if (error instanceof DatabaseUnavailableError) {
+    return true;
+  }
+
+  // Check for DrizzleQueryError with a database connection error in its cause
+  // Drizzle wraps pg errors in DrizzleQueryError with the pg error as `cause`
+  if (error !== null && typeof error === 'object') {
+    const cause = (error as { cause?: unknown }).cause;
+    if (cause instanceof pg.DatabaseError) {
+      // ECONNREFUSED means connection refused - database is not running
+      // Other connection errors: EHOSTUNREACH, ENOTFOUND, etc.
+      return cause.code === 'ECONNREFUSED' || cause.code === 'EHOSTUNREACH' || cause.code === 'ENOTFOUND';
+    }
+  }
+
+  return false;
+}
+
 export function toHttpError(error: unknown): HttpError {
   if (error instanceof HttpError) {
     return error;
+  }
+
+  if (isDatabaseUnavailableError(error)) {
+    return new HttpError(503, 'DATABASE_UNAVAILABLE', 'Database is unavailable');
   }
 
   if (error instanceof ValidationError) {

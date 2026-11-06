@@ -7,6 +7,7 @@ const api = vi.hoisted(() => {
 
   return {
     ApiError,
+    checkHealth: vi.fn().mockResolvedValue({ status: 'ok' }),
     getCars: vi.fn(),
     addCar: vi.fn(),
     renameCar: vi.fn(),
