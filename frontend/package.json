@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "build": "tsc --noEmit -p tsconfig.json && vite build"
+    "build": "vite build"
   },
   "engines": {
     "node": ">=24"

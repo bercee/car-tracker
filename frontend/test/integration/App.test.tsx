@@ -3,10 +3,19 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => {
-  class ApiError extends Error {}
+  class ApiError extends Error {
+    constructor(
+      message: string,
+      readonly field?: string,
+      readonly kind: string = 'rejected',
+    ) {
+      super(message);
+    }
+  }
 
   return {
     ApiError,
+    checkHealth: vi.fn().mockResolvedValue({ status: 'ok' }),
     getCars: vi.fn(),
     addCar: vi.fn(),
     renameCar: vi.fn(),
@@ -50,6 +59,7 @@ const deferred = <T,>() => {
 };
 
 const defaults = () => {
+  api.checkHealth.mockResolvedValue({ status: 'ok' });
   api.getCars.mockResolvedValue(cars);
   api.getFuel.mockResolvedValue([]);
   api.getAdBlue.mockResolvedValue([]);
@@ -70,6 +80,44 @@ describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+  });
+
+  const unavailable = () => new api.ApiError('Database is unavailable', undefined, 'database-unavailable');
+
+  it('shows the database banner when loading cars reports an outage', async () => {
+    defaults();
+    api.getCars.mockRejectedValueOnce(unavailable());
+    render(<App />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Database Unavailable');
+    expect(screen.queryByRole('tab', { name: 'Fuel' })).not.toBeInTheDocument();
+  });
+
+  it('shows the database banner from the health probe while cars are still loading', async () => {
+    defaults();
+    api.getCars.mockReturnValueOnce(deferred<typeof cars>().promise);
+    api.checkHealth.mockRejectedValueOnce(unavailable());
+    render(<App />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Database Unavailable');
+    expect(screen.queryByText('Loading cars…')).not.toBeInTheDocument();
+  });
+
+  it('recovers from the database banner with Try again', async () => {
+    defaults();
+    api.getCars.mockRejectedValueOnce(unavailable());
+    render(<App />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('tab', { name: 'Fuel' })).toBeInTheDocument();
+    expect(screen.queryByText('Database Unavailable')).not.toBeInTheDocument();
+    expect(api.getCars).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the plain error for failures that are not an outage', async () => {
+    defaults();
+    api.getCars.mockRejectedValueOnce(new api.ApiError('Boom'));
+    render(<App />);
+    expect(await screen.findByText('Boom')).toBeInTheDocument();
+    expect(screen.queryByText('Database Unavailable')).not.toBeInTheDocument();
   });
 
   it('defaults to Fuel and provides accessible tabs', async () => {

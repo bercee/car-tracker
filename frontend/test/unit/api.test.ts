@@ -5,6 +5,7 @@ import {
   addCar,
   addExpense,
   addFuel,
+  checkHealth,
   deleteAdBlue,
   deleteExpense,
   deleteFuel,
@@ -72,9 +73,11 @@ describe('api client', () => {
           new Response(JSON.stringify({ error: { message: 'Bad input', field: 'liters' } }), { status: 400 }),
         ),
     );
-    await expect(getFuel(1)).rejects.toMatchObject({ message: 'Bad input', field: 'liters' });
+    await expect(getFuel(1)).rejects.toMatchObject({ message: 'Bad input', field: 'liters', kind: 'rejected' });
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
-    await expect(getFuel(1)).rejects.toEqual(new ApiError('Unable to reach the server. Please try again.'));
+    await expect(getFuel(1)).rejects.toEqual(
+      new ApiError('Unable to reach the server. Please try again.', undefined, 'network'),
+    );
   });
 
   it('uses member paths and methods, and accepts empty 204 delete responses', async () => {
@@ -107,9 +110,31 @@ describe('api client', () => {
 
   it('uses safe fallbacks for malformed responses and incomplete error envelopes', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not JSON', { status: 200 })));
-    await expect(getFuel(1)).rejects.toEqual(new ApiError('The server returned an invalid response.'));
+    await expect(getFuel(1)).rejects.toEqual(
+      new ApiError('The server returned an invalid response.', undefined, 'network'),
+    );
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: {} }), { status: 400 })));
-    await expect(getFuel(1)).rejects.toEqual(new ApiError('The request could not be completed.'));
+    await expect(getFuel(1)).rejects.toEqual(
+      new ApiError('The request could not be completed.', undefined, 'rejected'),
+    );
+  });
+
+  it('classifies a DATABASE_UNAVAILABLE response, including the health body', async () => {
+    const error = { code: 'DATABASE_UNAVAILABLE', message: 'Database is unavailable' };
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve(new Response(JSON.stringify({ status: 'unavailable', error }), { status: 503 })),
+        ),
+    );
+
+    await expect(checkHealth()).rejects.toMatchObject({
+      message: 'Database is unavailable',
+      kind: 'database-unavailable',
+    });
+    await expect(getFuel(1)).rejects.toMatchObject({ kind: 'database-unavailable' });
   });
 });
