@@ -13,3 +13,7 @@ Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/ag
 ## Commit quality gate
 
 Before creating any commit, run `npm run check` and resolve every failure. Create commits only after the full check passes; the pre-commit hook enforces this gate.
+
+## Comments
+
+Comments explain why, not what. Don't narrate changes or reference tasks. Record architectural decisions in `docs/adr/` and domain terms in `GLOSSARY.md`.

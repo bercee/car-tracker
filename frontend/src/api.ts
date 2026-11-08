@@ -61,7 +61,6 @@ const post = <T>(path: string, body: unknown) => request<T>(path, { method: 'POS
 const put = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(body) });
 const remove = (path: string) => request<void>(path, { method: 'DELETE' });
 
-// Health check - returns { status: 'ok' } or throws ApiError with kind 'database-unavailable'
 export interface HealthStatus {
   status: string;
 }
