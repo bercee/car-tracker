@@ -10,7 +10,6 @@ const isEditable = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 
-// What Undo and Redo each read from and do to the Undo history, and their status wording.
 const verbs = {
   Undo: {
     done: 'Undid',
@@ -88,7 +87,6 @@ export function Panel<Form, Request extends { eventDate: string }, Rec extends {
   // True while a save, update, delete, undo or redo is in flight. Every change to the Undo history happens inside
   // `track`, and its final `setPending(false)` re-renders, so reading the Undo history during render is always current.
   const [pending, setPending] = useState(false);
-  // Whether a save or update is in flight, so only the submit button says "Saving…" or "Updating…".
   const [saving, setSaving] = useState(false);
   const track = async <V,>(change: () => Promise<V>) => {
     setPending(true);

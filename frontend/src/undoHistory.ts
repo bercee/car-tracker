@@ -43,7 +43,6 @@ export class UndoHistory {
     return this.step(this.undone, this.done, 'reapply', shouldDiscard);
   }
 
-  // Applies the newest Record action of `from` and moves it onto `to`.
   private async step(
     from: RecordAction[],
     to: RecordAction[],

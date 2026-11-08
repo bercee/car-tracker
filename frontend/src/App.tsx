@@ -23,7 +23,7 @@ const recordPanels: [Section, ComponentType<RecordPanelProps>][] = [
 ];
 const recordSections = recordPanels.map(([section]) => section);
 
-// Folds only ASCII A-Z, matching the backend's car ordering (see PostgresCarDatabase.listCars).
+// Folds only ASCII A-Z, matching the backend's car ordering (ADR 0006).
 const foldAscii = (name: string) => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
 const byName = (a: Car, b: Car) => {
   const left = foldAscii(a.name);
