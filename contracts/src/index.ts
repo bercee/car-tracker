@@ -6,16 +6,17 @@ export const pathIdSchema = z.coerce
   .int({ error: 'must be a positive integer' })
   .positive({ error: 'must be a positive integer' });
 
-export const dateSchema = z.iso.date({ error: 'Enter a valid date.' });
+// ISO 8601 allows year 0000, but a calendar date starts at year 1.
+export const dateSchema = z.iso
+  .date({ error: 'Enter a valid date.' })
+  .refine((date) => !date.startsWith('0000'), { error: 'Enter a valid date.' });
 
-const PRICE_MESSAGE = 'Enter a whole HUF price from 0 to 9,999,999.';
-export const priceSchema = z
-  .number({ error: PRICE_MESSAGE })
-  .int({ error: PRICE_MESSAGE })
-  .min(0, { error: PRICE_MESSAGE })
-  .max(9_999_999, { error: PRICE_MESSAGE });
+const wholeNumberUpTo = (max: number, message: string) =>
+  z.number({ error: message }).int({ error: message }).min(0, { error: message }).max(max, { error: message });
 
-// Trimmed text where blank (or absent) is stored as null.
+export const priceSchema = wholeNumberUpTo(9_999_999, 'Enter a whole HUF price from 0 to 9,999,999.');
+
+// Trimmed text; blank or absent becomes null.
 export const optionalText = (maxLength: number, label: string) =>
   z
     .string({ error: `${label} must be text.` })
@@ -31,26 +32,20 @@ export const litersSchema = z
   .max(9_999.999, { error: LITERS_MESSAGE })
   .multipleOf(0.001, { error: LITERS_MESSAGE });
 
-const ODOMETER_MESSAGE = 'Enter an odometer value from 0 to 9,999,999 km.';
-export const odometerSchema = z
-  .number({ error: ODOMETER_MESSAGE })
-  .int({ error: ODOMETER_MESSAGE })
-  .min(0, { error: ODOMETER_MESSAGE })
-  .max(9_999_999, { error: ODOMETER_MESSAGE });
+export const odometerSchema = wholeNumberUpTo(9_999_999, 'Enter an odometer value from 0 to 9,999,999 km.');
 
-export const adBlueRequestSchema = z.strictObject({
+const refuelEventFields = {
   eventDate: dateSchema,
   odometerKm: odometerSchema,
   liters: litersSchema,
   price: priceSchema,
-});
+};
+
+export const adBlueRequestSchema = z.strictObject({ ...refuelEventFields });
 export type AdBlueRequest = z.infer<typeof adBlueRequestSchema>;
 
 export const fuelRequestSchema = z.strictObject({
-  eventDate: dateSchema,
-  odometerKm: odometerSchema,
-  liters: litersSchema,
-  price: priceSchema,
+  ...refuelEventFields,
   fullTank: z.boolean({ error: 'Choose whether the tank was filled.' }),
   remark: optionalText(500, 'Remark'),
 });

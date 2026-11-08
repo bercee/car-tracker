@@ -25,12 +25,10 @@ const initial = (): FuelForm => ({
 });
 const parse = (form: FuelForm) =>
   parseRequest(fuelRequestSchema, {
-    eventDate: form.eventDate,
+    ...form,
     odometerKm: numberOf(form.odometerKm),
     liters: numberOf(form.liters),
     price: numberOf(form.price),
-    fullTank: form.fullTank,
-    remark: form.remark,
   });
 const columns: RecordTableColumn<FuelRecord>[] = [
   { header: 'Date', render: (record) => formatDate(record.eventDate) },
@@ -92,7 +90,6 @@ export function FuelPanel({ carId, visible }: RecordPanelProps) {
             <input
               type="number"
               min="0"
-              max="9999999"
               step="1"
               value={v.odometerKm}
               onChange={(e) => set({ ...v, odometerKm: e.target.value })}
@@ -125,7 +122,7 @@ export function FuelPanel({ carId, visible }: RecordPanelProps) {
           </label>
           <label>
             Remark
-            <textarea maxLength={500} value={v.remark} onChange={(e) => set({ ...v, remark: e.target.value })} />
+            <textarea value={v.remark} onChange={(e) => set({ ...v, remark: e.target.value })} />
           </label>
         </>
       )}

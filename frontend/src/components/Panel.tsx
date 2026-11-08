@@ -38,29 +38,29 @@ export interface RecordPanelProps {
   visible: boolean;
 }
 
-export interface PanelActions<R> {
-  onEdit: (record: R) => void;
-  onDelete: (record: R) => void;
+export interface PanelActions<Rec> {
+  onEdit: (record: Rec) => void;
+  onDelete: (record: Rec) => void;
   disabled: boolean;
 }
 
-export interface PanelProps<T, Q extends { eventDate: string }, R extends { id: number }> {
+export interface PanelProps<Form, Request extends { eventDate: string }, Rec extends { id: number }> {
   title: string;
   visible: boolean;
-  load: () => Promise<R[]>;
-  submit: (value: Q) => Promise<R>;
-  update: (id: number, value: Q) => Promise<unknown>;
+  load: () => Promise<Rec[]>;
+  submit: (value: Request) => Promise<Rec>;
+  update: (id: number, value: Request) => Promise<unknown>;
   remove: (id: number) => Promise<void>;
-  toFormValue: (record: R) => T;
+  toFormValue: (record: Rec) => Form;
   /** The request that would recreate or restore a Record, kept in the Undo history. */
-  toRequest: (record: R) => Q;
-  initial: () => T;
-  parse: (value: T) => Parsed<Q>;
-  children: (value: T, setValue: (value: T) => void, disabled: boolean) => ReactNode;
-  table: (records: R[], actions: PanelActions<R>) => ReactNode;
+  toRequest: (record: Rec) => Request;
+  initial: () => Form;
+  parse: (value: Form) => Parsed<Request>;
+  children: (value: Form, setValue: (value: Form) => void, disabled: boolean) => ReactNode;
+  table: (records: Rec[], actions: PanelActions<Rec>) => ReactNode;
 }
 
-export function Panel<T, Q extends { eventDate: string }, R extends { id: number }>({
+export function Panel<Form, Request extends { eventDate: string }, Rec extends { id: number }>({
   title,
   visible,
   load,
@@ -73,12 +73,12 @@ export function Panel<T, Q extends { eventDate: string }, R extends { id: number
   parse,
   children,
   table,
-}: PanelProps<T, Q, R>) {
+}: PanelProps<Form, Request, Rec>) {
   const [value, setValue] = useState(initial);
-  const [records, setRecords] = useState<R[]>([]);
+  const [records, setRecords] = useState<Rec[]>([]);
   const [loading, setLoading] = useState(true);
-  // The Record being edited, with its values as loaded into the form, so the edit can be undone.
-  const [editing, setEditing] = useState<{ id: number; before: Q }>();
+  // The Record being edited, with the request that restores it, so the edit can be undone.
+  const [editing, setEditing] = useState<{ id: number; before: Request }>();
   const editingId = editing?.id;
   const [message, setMessage] = useState<string>();
   const [error, setError] = useState<string>();
@@ -127,21 +127,21 @@ export function Panel<T, Q extends { eventDate: string }, R extends { id: number
   }, [load]);
 
   const label = (kind: 'add' | 'edit' | 'delete') => `${kind} of ${title} record`;
-  const addAction = (id: number, after: Q): RecordAction => ({
+  const addAction = (id: number, after: Request): RecordAction => ({
     recordId: id,
     label: label('add'),
     eventDate: after.eventDate,
     reverse: (current) => remove(current),
     reapply: async () => (await submit(after)).id,
   });
-  const editAction = (id: number, before: Q, after: Q): RecordAction => ({
+  const editAction = (id: number, before: Request, after: Request): RecordAction => ({
     recordId: id,
     label: label('edit'),
     eventDate: before.eventDate,
     reverse: async (current) => void (await update(current, before)),
     reapply: async (current) => void (await update(current, after)),
   });
-  const deleteAction = (id: number, before: Q): RecordAction => ({
+  const deleteAction = (id: number, before: Request): RecordAction => ({
     recordId: id,
     label: label('delete'),
     eventDate: before.eventDate,
@@ -149,7 +149,7 @@ export function Panel<T, Q extends { eventDate: string }, R extends { id: number
     reapply: (current) => remove(current),
   });
 
-  const onEdit = (record: R) => {
+  const onEdit = (record: Rec) => {
     setEditing({ id: record.id, before: toRequest(record) });
     setValue(toFormValue(record));
     setError(undefined);
@@ -236,7 +236,7 @@ export function Panel<T, Q extends { eventDate: string }, R extends { id: number
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   });
-  const onDelete = async (record: R) => {
+  const onDelete = async (record: Rec) => {
     setError(undefined);
     setMessage(undefined);
     try {

@@ -58,12 +58,12 @@ function CarForm({
   };
 
   return (
-    <form onSubmit={onSubmit}>
+    <form onSubmit={onSubmit} noValidate>
       <fieldset disabled={pending}>
         <legend>{legend}</legend>
         <label>
           {label}
-          <input value={name} maxLength={60} required onChange={(event) => setName(event.target.value)} />
+          <input value={name} required onChange={(event) => setName(event.target.value)} />
         </label>
         <button type="submit">{pending ? pendingLabel : submitLabel}</button>
       </fieldset>

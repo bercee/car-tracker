@@ -64,7 +64,7 @@ export function ExpensesPanel({ carId, visible }: RecordPanelProps) {
           </label>
           <label>
             Notes
-            <textarea maxLength={1000} value={v.notes} onChange={(e) => set({ ...v, notes: e.target.value })} />
+            <textarea value={v.notes} onChange={(e) => set({ ...v, notes: e.target.value })} />
           </label>
         </>
       )}

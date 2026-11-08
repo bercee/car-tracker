@@ -16,7 +16,7 @@ interface AdBlueForm {
 const initial = (): AdBlueForm => ({ eventDate: today(), odometerKm: '0', liters: '', price: '' });
 const parse = (form: AdBlueForm) =>
   parseRequest(adBlueRequestSchema, {
-    eventDate: form.eventDate,
+    ...form,
     odometerKm: numberOf(form.odometerKm),
     liters: numberOf(form.liters),
     price: numberOf(form.price),
@@ -70,7 +70,6 @@ export function AdBluePanel({ carId, visible }: RecordPanelProps) {
             <input
               type="number"
               min="0"
-              max="9999999"
               value={v.odometerKm}
               onChange={(e) => set({ ...v, odometerKm: e.target.value })}
               required

@@ -8,5 +8,12 @@ export function parseRequest<Schema extends z.ZodType>(schema: Schema, input: un
   return result.success ? { data: result.data } : { error: result.error.issues[0]!.message };
 }
 
-// An empty input is missing (undefined), not 0.
-export const numberOf = (text: string): number | undefined => (text.trim() === '' ? undefined : Number(text));
+const plainNumber = /^-?\d+(\.\d+)?$/;
+
+// An empty input is missing (undefined), not 0. Only plain decimal spellings convert; anything else (1e3, 0x10) is
+// NaN, so the shared schema rejects it. Negatives convert so the schema can report them.
+export const numberOf = (text: string): number | undefined => {
+  const trimmed = text.trim();
+  if (trimmed === '') return undefined;
+  return plainNumber.test(trimmed) ? Number(trimmed) : NaN;
+};

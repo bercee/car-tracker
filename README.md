@@ -6,7 +6,7 @@ backed by PostgreSQL. The repository is organized as npm workspaces for shared
 `@car-tracker/contracts`, the backend, and the frontend.
 
 All monetary values are whole Hungarian forints. Fuel and AdBlue total prices,
-and general expense amounts are stored as integer HUF values; fractional
+and general expense prices are stored as integer HUF values; fractional
 HUF input is not accepted. Liter quantities retain three-decimal precision.
 
 ## Prerequisites

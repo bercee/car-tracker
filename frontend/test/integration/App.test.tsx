@@ -213,6 +213,8 @@ describe('App', () => {
     expect(await save()).toHaveTextContent('liters');
     await fill('Liters', '10000');
     expect(await save()).toHaveTextContent('liters');
+    await fill('Liters', '1e3');
+    expect(await save()).toHaveTextContent('liters');
     await fill('Liters', '5');
     await fill('Total price (HUF)', '');
     expect(await save()).toHaveTextContent('HUF price');
@@ -261,7 +263,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Save record' }));
     expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('HUF price');
 
-    for (const price of ['-5', '10000000', 'abc']) {
+    for (const price of ['-5', '10000000', 'abc', '1e3', '0x10', 'Infinity']) {
       await user.clear(screen.getByLabelText('Price (HUF)'));
       await user.type(screen.getByLabelText('Price (HUF)'), price);
       await user.click(screen.getByRole('button', { name: 'Save record' }));
@@ -717,6 +719,16 @@ describe('App', () => {
     await screen.findByText('No records yet.');
     await user.click(screen.getByRole('tab', { name: 'Cars' }));
     await user.type(screen.getByLabelText('Name'), '   ');
+    await user.click(screen.getByRole('button', { name: 'Add car' }));
+    expect(await screen.findByText('Enter a car name.')).toBeInTheDocument();
+    expect(api.addCar).not.toHaveBeenCalled();
+  });
+  it('rejects an empty car name with the schema message and no request', async () => {
+    defaults();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('No records yet.');
+    await user.click(screen.getByRole('tab', { name: 'Cars' }));
     await user.click(screen.getByRole('button', { name: 'Add car' }));
     expect(await screen.findByText('Enter a car name.')).toBeInTheDocument();
     expect(api.addCar).not.toHaveBeenCalled();
