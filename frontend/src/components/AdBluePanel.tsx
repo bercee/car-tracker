@@ -3,7 +3,7 @@ import { addAdBlue, deleteAdBlue, getAdBlue, updateAdBlue } from '../api';
 import { formatDate, formatLiters, formatMoney, today } from '../format';
 import { numberOf, parseRequest } from '../form';
 import { adBlueRequestSchema, type AdBlueRecord, type AdBlueRequest } from '@car-tracker/contracts';
-import { Panel } from './Panel';
+import { Panel, type RecordPanelProps } from './Panel';
 import { RecordTable, type RecordTableColumn } from './RecordTable';
 
 interface AdBlueForm {
@@ -28,7 +28,7 @@ const columns: RecordTableColumn<AdBlueRecord>[] = [
   { header: 'Price', render: (record) => formatMoney(record.price) },
 ];
 
-export function AdBluePanel({ carId }: { carId: number }) {
+export function AdBluePanel({ carId, visible }: RecordPanelProps) {
   const load = useCallback(() => getAdBlue(carId), [carId]);
   const submit = useCallback((value: AdBlueRequest) => addAdBlue(carId, value), [carId]);
   const update = useCallback((id: number, value: AdBlueRequest) => updateAdBlue(carId, id, value), [carId]);
@@ -36,6 +36,7 @@ export function AdBluePanel({ carId }: { carId: number }) {
   return (
     <Panel
       title="AdBlue"
+      visible={visible}
       load={load}
       submit={submit}
       update={update}
@@ -46,6 +47,7 @@ export function AdBluePanel({ carId }: { carId: number }) {
         liters: String(r.liters),
         price: String(r.price),
       })}
+      toRequest={(r) => ({ eventDate: r.eventDate, odometerKm: r.odometerKm, liters: r.liters, price: r.price })}
       initial={initial}
       parse={parse}
       table={(records, actions) => (

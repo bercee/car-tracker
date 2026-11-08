@@ -10,10 +10,14 @@ import type {
   FuelRequest,
 } from '@car-tracker/contracts';
 
+/** Why a request failed: no usable response, HTTP 404, database down, or any other error response. */
+export type ApiErrorKind = 'network' | 'not-found' | 'database-unavailable' | 'rejected';
+
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly field?: string,
+    readonly kind: ApiErrorKind = 'rejected',
   ) {
     super(message);
     this.name = 'ApiError';
@@ -32,22 +36,37 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     });
     if (response.status === 204) return undefined as T;
     const body: unknown = await response.json().catch(() => {
-      throw new ApiError('The server returned an invalid response.');
+      throw new ApiError('The server returned an invalid response.', undefined, 'network');
     });
     if (!response.ok) {
       const envelope = body as Partial<ErrorEnvelope>;
-      throw new ApiError(envelope.error?.message ?? 'The request could not be completed.', envelope.error?.field);
+      const message = envelope.error?.message ?? 'The request could not be completed.';
+      const field = envelope.error?.field;
+      const kind: ApiErrorKind =
+        envelope.error?.code === 'DATABASE_UNAVAILABLE'
+          ? 'database-unavailable'
+          : response.status === 404
+            ? 'not-found'
+            : 'rejected';
+      throw new ApiError(message, field, kind);
     }
     return body as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    throw new ApiError('Unable to reach the server. Please try again.');
+    throw new ApiError('Unable to reach the server. Please try again.', undefined, 'network');
   }
 }
 const get = <T>(path: string) => request<T>(path);
 const post = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) });
 const put = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(body) });
 const remove = (path: string) => request<void>(path, { method: 'DELETE' });
+
+// Health check - returns { status: 'ok' } or throws ApiError with kind 'database-unavailable'
+export interface HealthStatus {
+  status: string;
+}
+
+export const checkHealth = () => get<HealthStatus>('/api/health');
 export const getCars = () => get<Car[]>('/api/cars');
 export const addCar = (body: CarRequest) => post<Car>('/api/cars', body);
 export const renameCar = (id: number, body: CarRequest) => put<Car>(`/api/cars/${id}`, body);

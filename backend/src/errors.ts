@@ -18,9 +18,49 @@ export class HttpError extends Error {
   }
 }
 
+// Socket errors, plus the SQLSTATEs Postgres sends while refusing or ending connections (08xxx is matched by prefix).
+const connectionFailureCodes = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ETIMEDOUT',
+  'EPIPE',
+  '53300',
+  '57P01',
+  '57P02',
+  '57P03',
+]);
+
+// Drizzle puts the driver error on `cause`; Node reports dual-stack connect failures as an AggregateError.
+// pg's "Connection terminated" errors carry no code, so they are matched by message.
+function isDatabaseUnavailableError(error: unknown, depth = 0): boolean {
+  if (!(error instanceof Error) || depth > 5) {
+    return false;
+  }
+
+  const code: unknown = Reflect.get(error, 'code');
+  if (typeof code === 'string' && (connectionFailureCodes.has(code) || code.startsWith('08'))) {
+    return true;
+  }
+
+  if (error.message.startsWith('Connection terminated')) {
+    return true;
+  }
+
+  const nested: unknown[] = error instanceof AggregateError ? error.errors : [];
+  return [error.cause, ...nested].some((inner) => isDatabaseUnavailableError(inner, depth + 1));
+}
+
 export function toHttpError(error: unknown): HttpError {
   if (error instanceof HttpError) {
     return error;
+  }
+
+  if (isDatabaseUnavailableError(error)) {
+    return new HttpError(503, 'DATABASE_UNAVAILABLE', 'Database is unavailable');
   }
 
   if (error instanceof ZodError) {

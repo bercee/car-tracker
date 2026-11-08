@@ -151,8 +151,10 @@ curl -i -X DELETE http://127.0.0.1:3000/api/cars/1/fuel/1
 
 `GET /api/health` runs `SELECT 1` against PostgreSQL with a 2-second limit. It
 returns `200 {"status":"ok"}` when the database answers and
-`503 {"status":"unavailable"}` when it does not. The backend keeps running
-while the database is down and reconnects once it is back.
+`503 {"status":"unavailable","error":{"code":"DATABASE_UNAVAILABLE","message":"Database is unavailable"}}`
+when it does not. The backend keeps running while the database is down and
+reconnects once it is back. While it is down, other endpoints that reach the
+database return `503` with the same `error` object.
 
 A car is `{ "id": 1, "name": "Octavia", "createdAt": "2026-09-17T08:00:00.000Z" }`.
 Car names are trimmed, must be 1 to 60 characters, and are unique ignoring

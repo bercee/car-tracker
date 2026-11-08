@@ -3,7 +3,7 @@ import { expenseRequestSchema, type ExpenseRecord, type ExpenseRequest } from '@
 import { addExpense, deleteExpense, getExpenses, updateExpense } from '../api';
 import { numberOf, parseRequest } from '../form';
 import { formatDate, formatMoney, today } from '../format';
-import { Panel } from './Panel';
+import { Panel, type RecordPanelProps } from './Panel';
 import { RecordTable, type RecordTableColumn } from './RecordTable';
 
 interface ExpenseForm {
@@ -20,7 +20,7 @@ const columns: RecordTableColumn<ExpenseRecord>[] = [
   { header: 'Notes', render: (record) => record.notes ?? '—' },
 ];
 
-export function ExpensesPanel({ carId }: { carId: number }) {
+export function ExpensesPanel({ carId, visible }: RecordPanelProps) {
   const load = useCallback(() => getExpenses(carId), [carId]);
   const submit = useCallback((value: ExpenseRequest) => addExpense(carId, value), [carId]);
   const update = useCallback((id: number, value: ExpenseRequest) => updateExpense(carId, id, value), [carId]);
@@ -28,11 +28,13 @@ export function ExpensesPanel({ carId }: { carId: number }) {
   return (
     <Panel
       title="Expenses"
+      visible={visible}
       load={load}
       submit={submit}
       update={update}
       remove={remove}
       toFormValue={(r) => ({ eventDate: r.eventDate, price: String(r.price), notes: r.notes ?? '' })}
+      toRequest={(r) => ({ eventDate: r.eventDate, price: r.price, notes: r.notes })}
       initial={initial}
       parse={parse}
       table={(records, actions) => (

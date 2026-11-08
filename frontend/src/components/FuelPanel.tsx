@@ -3,7 +3,7 @@ import { addFuel, deleteFuel, getFuel, updateFuel } from '../api';
 import { formatDate, formatLiters, formatMoney, today } from '../format';
 import { numberOf, parseRequest } from '../form';
 import { fuelRequestSchema, type FuelRecord, type FuelRequest } from '@car-tracker/contracts';
-import { Panel } from './Panel';
+import { Panel, type RecordPanelProps } from './Panel';
 import { RecordTable, type RecordTableColumn } from './RecordTable';
 
 interface FuelForm {
@@ -41,7 +41,7 @@ const columns: RecordTableColumn<FuelRecord>[] = [
   { header: 'Remark', render: (record) => record.remark ?? '—' },
 ];
 
-export function FuelPanel({ carId }: { carId: number }) {
+export function FuelPanel({ carId, visible }: RecordPanelProps) {
   const load = useCallback(() => getFuel(carId), [carId]);
   const submit = useCallback((value: FuelRequest) => addFuel(carId, value), [carId]);
   const update = useCallback((id: number, value: FuelRequest) => updateFuel(carId, id, value), [carId]);
@@ -49,6 +49,7 @@ export function FuelPanel({ carId }: { carId: number }) {
   return (
     <Panel
       title="Fuel"
+      visible={visible}
       load={load}
       submit={submit}
       update={update}
@@ -60,6 +61,14 @@ export function FuelPanel({ carId }: { carId: number }) {
         price: String(r.price),
         fullTank: r.fullTank,
         remark: r.remark ?? '',
+      })}
+      toRequest={(r) => ({
+        eventDate: r.eventDate,
+        odometerKm: r.odometerKm,
+        liters: r.liters,
+        price: r.price,
+        fullTank: r.fullTank,
+        remark: r.remark,
       })}
       initial={initial}
       parse={parse}
