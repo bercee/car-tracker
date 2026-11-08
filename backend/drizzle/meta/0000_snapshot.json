@@ -1,5 +1,5 @@
 {
-  "id": "e60e0219-a36f-4d93-86eb-b20fb791f2d5",
+  "id": "7f8684c7-9ff9-4c7a-990c-1aad467e2096",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -50,14 +50,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "liters_milliliters": {
-          "name": "liters_milliliters",
-          "type": "integer",
+        "liters": {
+          "name": "liters",
+          "type": "numeric(7, 3)",
           "primaryKey": false,
           "notNull": true
         },
-        "price_huf": {
-          "name": "price_huf",
+        "price": {
+          "name": "price",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -115,13 +115,13 @@
           "name": "adblue_odometer_km_nonnegative",
           "value": "\"adblue\".\"odometer_km\" >= 0"
         },
-        "adblue_liters_milliliters_positive": {
-          "name": "adblue_liters_milliliters_positive",
-          "value": "\"adblue\".\"liters_milliliters\" > 0"
+        "adblue_liters_positive": {
+          "name": "adblue_liters_positive",
+          "value": "\"adblue\".\"liters\" > 0"
         },
-        "adblue_price_huf_nonnegative": {
-          "name": "adblue_price_huf_nonnegative",
-          "value": "\"adblue\".\"price_huf\" >= 0"
+        "adblue_price_nonnegative": {
+          "name": "adblue_price_nonnegative",
+          "value": "\"adblue\".\"price\" >= 0"
         }
       },
       "isRLSEnabled": false
@@ -230,8 +230,8 @@
           "notNull": true,
           "default": "now()"
         },
-        "amount_huf": {
-          "name": "amount_huf",
+        "price": {
+          "name": "price",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -291,9 +291,9 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "expenses_amount_huf_nonnegative": {
-          "name": "expenses_amount_huf_nonnegative",
-          "value": "\"expenses\".\"amount_huf\" >= 0"
+        "expenses_price_nonnegative": {
+          "name": "expenses_price_nonnegative",
+          "value": "\"expenses\".\"price\" >= 0"
         },
         "expenses_notes_length": {
           "name": "expenses_notes_length",
@@ -348,14 +348,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "liters_milliliters": {
-          "name": "liters_milliliters",
-          "type": "integer",
+        "liters": {
+          "name": "liters",
+          "type": "numeric(7, 3)",
           "primaryKey": false,
           "notNull": true
         },
-        "price_huf": {
-          "name": "price_huf",
+        "price": {
+          "name": "price",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -425,13 +425,13 @@
           "name": "fuel_odometer_km_nonnegative",
           "value": "\"fuel\".\"odometer_km\" >= 0"
         },
-        "fuel_liters_milliliters_positive": {
-          "name": "fuel_liters_milliliters_positive",
-          "value": "\"fuel\".\"liters_milliliters\" > 0"
+        "fuel_liters_positive": {
+          "name": "fuel_liters_positive",
+          "value": "\"fuel\".\"liters\" > 0"
         },
-        "fuel_price_huf_nonnegative": {
-          "name": "fuel_price_huf_nonnegative",
-          "value": "\"fuel\".\"price_huf\" >= 0"
+        "fuel_price_nonnegative": {
+          "name": "fuel_price_nonnegative",
+          "value": "\"fuel\".\"price\" >= 0"
         },
         "fuel_remark_length": {
           "name": "fuel_remark_length",

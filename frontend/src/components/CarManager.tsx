@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react';
-import type { Car } from '@car-tracker/contracts';
+import { carRequestSchema, type Car } from '@car-tracker/contracts';
 
 import { addCar, ApiError, renameCar } from '../api';
-import { validateCarName } from '../validation';
+import { parseRequest } from '../form';
 import { useIsMounted } from '../useIsMounted';
 import { StatusMessage } from './StatusMessage';
 
@@ -36,9 +36,9 @@ function CarForm({
   const isMounted = useIsMounted();
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    const invalid = validateCarName(name);
-    if (invalid) {
-      setError(invalid);
+    const parsed = parseRequest(carRequestSchema, { name });
+    if ('error' in parsed) {
+      setError(parsed.error);
       setMessage(undefined);
       return;
     }
@@ -46,7 +46,7 @@ function CarForm({
     setError(undefined);
     setMessage(undefined);
     try {
-      await save(name.trim());
+      await save(parsed.data.name);
       if (!isMounted()) return;
       if (resetOnSuccess) setName('');
       setMessage(successMessage);
@@ -58,12 +58,12 @@ function CarForm({
   };
 
   return (
-    <form onSubmit={onSubmit}>
+    <form onSubmit={onSubmit} noValidate>
       <fieldset disabled={pending}>
         <legend>{legend}</legend>
         <label>
           {label}
-          <input value={name} maxLength={60} required onChange={(event) => setName(event.target.value)} />
+          <input value={name} required onChange={(event) => setName(event.target.value)} />
         </label>
         <button type="submit">{pending ? pendingLabel : submitLabel}</button>
       </fieldset>

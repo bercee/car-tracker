@@ -32,6 +32,7 @@ WORKDIR /app
 COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/backend/package.json ./package.json
 COPY --from=build /app/backend/dist ./dist
+COPY --from=build /app/contracts ./contracts
 COPY backend/drizzle ./drizzle
 RUN chown -R node:node /app
 

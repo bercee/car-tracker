@@ -4,11 +4,11 @@ CREATE TABLE "adblue" (
 	"event_date" date NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"odometer_km" integer NOT NULL,
-	"liters_milliliters" integer NOT NULL,
-	"price_huf" integer NOT NULL,
+	"liters" numeric(7, 3) NOT NULL,
+	"price" integer NOT NULL,
 	CONSTRAINT "adblue_odometer_km_nonnegative" CHECK ("adblue"."odometer_km" >= 0),
-	CONSTRAINT "adblue_liters_milliliters_positive" CHECK ("adblue"."liters_milliliters" > 0),
-	CONSTRAINT "adblue_price_huf_nonnegative" CHECK ("adblue"."price_huf" >= 0)
+	CONSTRAINT "adblue_liters_positive" CHECK ("adblue"."liters" > 0),
+	CONSTRAINT "adblue_price_nonnegative" CHECK ("adblue"."price" >= 0)
 );
 --> statement-breakpoint
 CREATE TABLE "cars" (
@@ -23,9 +23,9 @@ CREATE TABLE "expenses" (
 	"car_id" integer NOT NULL,
 	"event_date" date NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"amount_huf" integer NOT NULL,
+	"price" integer NOT NULL,
 	"notes" text,
-	CONSTRAINT "expenses_amount_huf_nonnegative" CHECK ("expenses"."amount_huf" >= 0),
+	CONSTRAINT "expenses_price_nonnegative" CHECK ("expenses"."price" >= 0),
 	CONSTRAINT "expenses_notes_length" CHECK ("expenses"."notes" IS NULL OR char_length("expenses"."notes") <= 1000)
 );
 --> statement-breakpoint
@@ -35,13 +35,13 @@ CREATE TABLE "fuel" (
 	"event_date" date NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"odometer_km" integer NOT NULL,
-	"liters_milliliters" integer NOT NULL,
-	"price_huf" integer NOT NULL,
+	"liters" numeric(7, 3) NOT NULL,
+	"price" integer NOT NULL,
 	"full_tank" boolean NOT NULL,
 	"remark" text,
 	CONSTRAINT "fuel_odometer_km_nonnegative" CHECK ("fuel"."odometer_km" >= 0),
-	CONSTRAINT "fuel_liters_milliliters_positive" CHECK ("fuel"."liters_milliliters" > 0),
-	CONSTRAINT "fuel_price_huf_nonnegative" CHECK ("fuel"."price_huf" >= 0),
+	CONSTRAINT "fuel_liters_positive" CHECK ("fuel"."liters" > 0),
+	CONSTRAINT "fuel_price_nonnegative" CHECK ("fuel"."price" >= 0),
 	CONSTRAINT "fuel_remark_length" CHECK ("fuel"."remark" IS NULL OR char_length("fuel"."remark") <= 500)
 );
 --> statement-breakpoint

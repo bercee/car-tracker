@@ -1,18 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createErrorHandler, HttpError, toErrorEnvelope, toHttpError } from '../../src/errors.js';
-import { ValidationError } from '../../src/validation/common.js';
 
 describe('HTTP-safe errors', () => {
-  it('maps validation errors with their field', () => {
-    const error = toHttpError(new ValidationError('liters', 'liters must be greater than 0'));
-
-    expect(error).toMatchObject({ status: 400, code: 'VALIDATION_ERROR', field: 'liters' });
-    expect(toErrorEnvelope(error)).toEqual({
-      error: { code: 'VALIDATION_ERROR', message: 'liters must be greater than 0', field: 'liters' },
-    });
-  });
-
   it('preserves an existing HTTP-safe error without adding an absent field', () => {
     const error = new HttpError(404, 'NOT_FOUND', 'Missing');
 
