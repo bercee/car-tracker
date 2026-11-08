@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import type { Car } from '@car-tracker/contracts';
 import { ApiError, checkHealth, getCars } from './api';
 import { pickActiveCar, readStoredCarId, storeCarId } from './carSelection';
@@ -6,6 +6,7 @@ import { AdBluePanel } from './components/AdBluePanel';
 import { CarManager } from './components/CarManager';
 import { ExpensesPanel } from './components/ExpensesPanel';
 import { FuelPanel } from './components/FuelPanel';
+import type { RecordPanelProps } from './components/Panel';
 import { StatusMessage } from './components/StatusMessage';
 
 enum Section {
@@ -15,7 +16,12 @@ enum Section {
   Cars = 'Cars',
 }
 
-const recordSections = [Section.Fuel, Section.AdBlue, Section.Expenses];
+const recordPanels: [Section, ComponentType<RecordPanelProps>][] = [
+  [Section.Fuel, FuelPanel],
+  [Section.AdBlue, AdBluePanel],
+  [Section.Expenses, ExpensesPanel],
+];
+const recordSections = recordPanels.map(([section]) => section);
 
 // Folds only ASCII A-Z, matching the backend's car ordering (see PostgresCarDatabase.listCars).
 const foldAscii = (name: string) => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
@@ -171,21 +177,15 @@ export function App() {
           {carId === undefined && <p>No cars yet. Add a car to start tracking.</p>}
         </div>
       )}
-      {carId !== undefined && visitedSections.has(Section.Fuel) && (
-        <div hidden={activeSection !== Section.Fuel}>
-          <FuelPanel key={carId} carId={carId} />
-        </div>
-      )}
-      {carId !== undefined && visitedSections.has(Section.AdBlue) && (
-        <div hidden={activeSection !== Section.AdBlue}>
-          <AdBluePanel key={carId} carId={carId} />
-        </div>
-      )}
-      {carId !== undefined && visitedSections.has(Section.Expenses) && (
-        <div hidden={activeSection !== Section.Expenses}>
-          <ExpensesPanel key={carId} carId={carId} />
-        </div>
-      )}
+      {carId !== undefined &&
+        recordPanels.map(
+          ([section, RecordPanel]) =>
+            visitedSections.has(section) && (
+              <div key={section} hidden={activeSection !== section}>
+                <RecordPanel key={carId} carId={carId} visible={activeSection === section} />
+              </div>
+            ),
+        )}
     </main>
   );
 }

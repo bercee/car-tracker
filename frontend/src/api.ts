@@ -10,7 +10,8 @@ import type {
   FuelRequest,
 } from '@car-tracker/contracts';
 
-export type ApiErrorKind = 'network' | 'database-unavailable' | 'rejected';
+/** Why a request failed: no usable response, HTTP 404, database down, or any other error response. */
+export type ApiErrorKind = 'network' | 'not-found' | 'database-unavailable' | 'rejected';
 
 export class ApiError extends Error {
   constructor(
@@ -41,7 +42,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       const envelope = body as Partial<ErrorEnvelope>;
       const message = envelope.error?.message ?? 'The request could not be completed.';
       const field = envelope.error?.field;
-      const kind = envelope.error?.code === 'DATABASE_UNAVAILABLE' ? 'database-unavailable' : 'rejected';
+      const kind: ApiErrorKind =
+        envelope.error?.code === 'DATABASE_UNAVAILABLE'
+          ? 'database-unavailable'
+          : response.status === 404
+            ? 'not-found'
+            : 'rejected';
       throw new ApiError(message, field, kind);
     }
     return body as T;

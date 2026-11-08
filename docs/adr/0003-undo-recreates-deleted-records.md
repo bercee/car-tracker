@@ -1,6 +1,6 @@
 # Undo re-creates deleted Records instead of restoring them
 
-Undo and redo of Record actions live only in the frontend, in memory, with one Undo history per Car and Panel. Undoing a delete (or redoing an add) creates the Record again through the normal create endpoint, so it comes back with a new id and creation time. Ids inside the Undo history are remapped to the new id. Lists sort by event date and then id, so the re-created Record usually appears where it was before. We chose this over a backend restore so the API and database stay unchanged for a protection feature that only lasts one page load.
+Undo and redo of Record actions live only in the frontend, in memory, with one Undo history per Panel (dropped when the Active car changes). Undoing a delete (or redoing an add) creates the Record again through the normal create endpoint, so it comes back with a new id and creation time. Ids inside the Undo history are remapped to the new id. Lists sort by event date and then id, so the re-created Record usually appears where it was before. We chose this over a backend restore so the API and database stay unchanged for a protection feature that only lasts a short while.
 
 ## Considered options
 
