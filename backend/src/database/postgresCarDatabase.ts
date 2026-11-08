@@ -17,8 +17,7 @@ import type { CarDatabase } from './carDatabase.js';
 import { DuplicateCarNameError } from './errors.js';
 import { mapAdBlueRow, mapCarRow, mapExpenseRow, mapFuelRow } from './mappers.js';
 
-// Folds only ASCII A-Z and compares by code point, so the order is locale-independent and the
-// frontend can reproduce it when it re-sorts after adding or renaming a Car.
+// Must stay in step with the frontend's byName (ADR 0006).
 const carNameOrder = sql`lower(${cars.name} COLLATE "C")`;
 
 export class PostgresCarDatabase implements CarDatabase {
