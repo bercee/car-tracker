@@ -15,12 +15,16 @@ The Car whose Records the Panels currently show.
 _Avoid_: Current car, selected car
 
 **Record**:
-One logged event for a Car: a fuel fill-up, an AdBlue top-up, or an expense. Each Record belongs to exactly one Car.
+One logged event for a Car: a fuel fill-up, an AdBlue top-up, or an expense. Each Record belongs to exactly one Car. A Fuel Record may be partial: it needs at least a date, an odometer reading or liters, and the rest may be blank.
 _Avoid_: Entry, log
 
 **Record type**:
 The kind of a Record: Fuel, AdBlue or Expenses.
 _Avoid_: Category
+
+**Reported consumption**:
+The average fuel consumption in L/100 km that the car computer showed, recorded as read on a Fuel Record. The app does not compute it.
+_Avoid_: Average consumption
 
 **Price**:
 What a Record cost, in whole HUF. Every Record type, an expense included, has a Price.
