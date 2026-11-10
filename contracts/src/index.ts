@@ -34,6 +34,19 @@ export const litersSchema = z
 
 export const odometerSchema = wholeNumberUpTo(9_999_999, 'Enter an odometer value from 0 to 9,999,999 km.');
 
+export const REPORTED_CONSUMPTION_MESSAGE =
+  'Enter a reported consumption above 0 and up to 99.9 L/100 km, with at most one decimal place.';
+export const reportedConsumptionSchema = z
+  .number({ error: REPORTED_CONSUMPTION_MESSAGE })
+  .positive({ error: REPORTED_CONSUMPTION_MESSAGE })
+  .max(99.9, { error: REPORTED_CONSUMPTION_MESSAGE })
+  .multipleOf(0.1, { error: REPORTED_CONSUMPTION_MESSAGE });
+
+// A partial Fuel Record may omit a value or send null; both are stored as null.
+const nullable = <T extends z.ZodType>(schema: T) => schema.nullish().transform((value) => value ?? null);
+
+export const FUEL_PRESENCE_MESSAGE = 'Enter at least a date, odometer or liters.';
+
 const refuelEventFields = {
   eventDate: dateSchema,
   odometerKm: odometerSchema,
@@ -44,12 +57,22 @@ const refuelEventFields = {
 export const adBlueRequestSchema = z.strictObject({ ...refuelEventFields });
 export type AdBlueRequest = z.infer<typeof adBlueRequestSchema>;
 
-export const fuelRequestSchema = z.strictObject({
-  ...refuelEventFields,
-  fullTank: z.boolean({ error: 'Choose whether the tank was filled.' }),
-  remark: optionalText(500, 'Remark'),
-});
-export type FuelRequest = z.infer<typeof fuelRequestSchema>;
+export const fuelRequestSchema = z
+  .strictObject({
+    eventDate: nullable(refuelEventFields.eventDate),
+    odometerKm: nullable(refuelEventFields.odometerKm),
+    liters: nullable(refuelEventFields.liters),
+    price: nullable(refuelEventFields.price),
+    reportedConsumption: nullable(reportedConsumptionSchema),
+    fullTank: z.boolean({ error: 'Choose whether the tank was filled.' }),
+    remark: optionalText(500, 'Remark'),
+  })
+  .refine((fuel) => fuel.eventDate !== null || fuel.odometerKm !== null || fuel.liters !== null, {
+    error: FUEL_PRESENCE_MESSAGE,
+  });
+// What a client may send (optional values null or omitted) versus what the schema parses it into (always explicit).
+export type FuelRequest = z.input<typeof fuelRequestSchema>;
+export type ParsedFuelRequest = z.output<typeof fuelRequestSchema>;
 
 export const expenseRequestSchema = z.strictObject({
   eventDate: dateSchema,
@@ -73,7 +96,7 @@ export interface Car extends CarRequest {
   createdAt: string;
 }
 
-export interface FuelRecord extends FuelRequest {
+export interface FuelRecord extends ParsedFuelRequest {
   id: number;
   createdAt: string;
 }

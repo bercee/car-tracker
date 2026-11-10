@@ -1,5 +1,5 @@
 {
-  "id": "7f8684c7-9ff9-4c7a-990c-1aad467e2096",
+  "id": "4524709b-969b-4ab5-9143-134fed582373",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -333,7 +333,7 @@
           "name": "event_date",
           "type": "date",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -346,19 +346,25 @@
           "name": "odometer_km",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "liters": {
           "name": "liters",
           "type": "numeric(7, 3)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "price": {
           "name": "price",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "reported_consumption": {
+          "name": "reported_consumption",
+          "type": "numeric(3, 1)",
+          "primaryKey": false,
+          "notNull": false
         },
         "full_tank": {
           "name": "full_tank",
@@ -387,7 +393,13 @@
               "expression": "event_date",
               "isExpression": false,
               "asc": false,
-              "nulls": "first"
+              "nulls": "last"
+            },
+            {
+              "expression": "odometer_km",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
             },
             {
               "expression": "id",
@@ -432,6 +444,14 @@
         "fuel_price_nonnegative": {
           "name": "fuel_price_nonnegative",
           "value": "\"fuel\".\"price\" >= 0"
+        },
+        "fuel_reported_consumption_positive": {
+          "name": "fuel_reported_consumption_positive",
+          "value": "\"fuel\".\"reported_consumption\" > 0"
+        },
+        "fuel_has_date_odometer_or_liters": {
+          "name": "fuel_has_date_odometer_or_liters",
+          "value": "\"fuel\".\"event_date\" IS NOT NULL OR \"fuel\".\"odometer_km\" IS NOT NULL OR \"fuel\".\"liters\" IS NOT NULL"
         },
         "fuel_remark_length": {
           "name": "fuel_remark_length",

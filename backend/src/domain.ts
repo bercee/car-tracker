@@ -7,4 +7,5 @@ export type {
   ExpenseRequest,
   FuelRecord,
   FuelRequest,
+  ParsedFuelRequest,
 } from '@car-tracker/contracts';

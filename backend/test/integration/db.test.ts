@@ -30,6 +30,7 @@ describe('PostgresCarDatabase', () => {
       odometerKm: 82_450,
       liters: 47.3,
       price: 29_284,
+      reportedConsumption: null,
       fullTank: true,
       remark: 'Shell',
     });
@@ -51,6 +52,7 @@ describe('PostgresCarDatabase', () => {
       odometerKm: 82_450,
       liters: 47.3,
       price: 29_284,
+      reportedConsumption: null,
       fullTank: true,
       remark: 'Shell',
     });
@@ -72,6 +74,7 @@ describe('PostgresCarDatabase', () => {
       odometerKm: 1,
       liters: 1,
       price: 600,
+      reportedConsumption: null,
       fullTank: false,
       remark: null,
     });
@@ -80,6 +83,7 @@ describe('PostgresCarDatabase', () => {
       odometerKm: 2,
       liters: 2,
       price: 610,
+      reportedConsumption: null,
       fullTank: true,
       remark: null,
     });
@@ -88,6 +92,7 @@ describe('PostgresCarDatabase', () => {
       odometerKm: 3,
       liters: 3,
       price: 620,
+      reportedConsumption: null,
       fullTank: true,
       remark: null,
     });
@@ -127,6 +132,7 @@ describe('PostgresCarDatabase', () => {
       odometerKm: 1,
       liters: 1,
       price: 100,
+      reportedConsumption: null,
       fullTank: false,
       remark: null,
     });
@@ -135,6 +141,7 @@ describe('PostgresCarDatabase', () => {
       odometerKm: 2,
       liters: 2,
       price: 200,
+      reportedConsumption: null,
       fullTank: true,
       remark: null,
     });
@@ -150,6 +157,7 @@ describe('PostgresCarDatabase', () => {
       odometerKm: 22,
       liters: 22.3,
       price: 22000,
+      reportedConsumption: null,
       fullTank: true,
       remark: 'updated',
     });
@@ -191,6 +199,7 @@ describe('PostgresCarDatabase', () => {
         odometerKm: 2,
         liters: 1,
         price: 100,
+        reportedConsumption: null,
         fullTank: false,
         remark: null,
       }),
@@ -244,6 +253,7 @@ describe('PostgresCarDatabase', () => {
       odometerKm: 1,
       liters: 1,
       price: 100,
+      reportedConsumption: null,
       fullTank: false,
       remark: null,
     };

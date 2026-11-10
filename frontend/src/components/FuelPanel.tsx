@@ -8,33 +8,47 @@ import { RecordTable, type RecordTableColumn } from './RecordTable';
 
 interface FuelForm {
   eventDate: string;
+  // A partly typed date reports value "" like a cleared one; only validity.badInput tells them apart.
+  eventDateUnreadable: boolean;
   odometerKm: string;
   liters: string;
   price: string;
+  reportedConsumption: string;
   fullTank: boolean;
   remark: string;
 }
 
 const initial = (): FuelForm => ({
   eventDate: today(),
-  odometerKm: '0',
+  eventDateUnreadable: false,
+  odometerKm: '',
   liters: '',
   price: '',
+  reportedConsumption: '',
   fullTank: true,
   remark: '',
 });
 const parse = (form: FuelForm) =>
-  parseRequest(fuelRequestSchema, {
-    ...form,
-    odometerKm: numberOf(form.odometerKm),
-    liters: numberOf(form.liters),
-    price: numberOf(form.price),
-  });
+  form.eventDateUnreadable
+    ? { error: 'Enter a complete date, or clear the date field.' }
+    : parseRequest(fuelRequestSchema, {
+        fullTank: form.fullTank,
+        remark: form.remark,
+        eventDate: form.eventDate || null,
+        odometerKm: numberOf(form.odometerKm) ?? null,
+        liters: numberOf(form.liters) ?? null,
+        price: numberOf(form.price) ?? null,
+        reportedConsumption: numberOf(form.reportedConsumption) ?? null,
+      });
 const columns: RecordTableColumn<FuelRecord>[] = [
-  { header: 'Date', render: (record) => formatDate(record.eventDate) },
-  { header: 'Odometer', render: (record) => record.odometerKm.toLocaleString() },
-  { header: 'Liters', render: (record) => formatLiters(record.liters) },
-  { header: 'Total price', render: (record) => formatMoney(record.price) },
+  { header: 'Date', render: (record) => (record.eventDate === null ? '—' : formatDate(record.eventDate)) },
+  { header: 'Odometer', render: (record) => record.odometerKm?.toLocaleString() ?? '—' },
+  { header: 'Liters', render: (record) => (record.liters === null ? '—' : formatLiters(record.liters)) },
+  { header: 'Total price', render: (record) => (record.price === null ? '—' : formatMoney(record.price)) },
+  {
+    header: 'Reported L/100 km',
+    render: (record) => record.reportedConsumption?.toFixed(1) ?? '—',
+  },
   { header: 'Full tank', render: (record) => (record.fullTank ? 'Yes' : 'No') },
   { header: 'Remark', render: (record) => record.remark ?? '—' },
 ];
@@ -53,10 +67,12 @@ export function FuelPanel({ carId, visible }: RecordPanelProps) {
       update={update}
       remove={remove}
       toFormValue={(r) => ({
-        eventDate: r.eventDate,
-        odometerKm: String(r.odometerKm),
-        liters: String(r.liters),
-        price: String(r.price),
+        eventDate: r.eventDate ?? '',
+        eventDateUnreadable: false,
+        odometerKm: r.odometerKm === null ? '' : String(r.odometerKm),
+        liters: r.liters === null ? '' : String(r.liters),
+        price: r.price === null ? '' : String(r.price),
+        reportedConsumption: r.reportedConsumption === null ? '' : String(r.reportedConsumption),
         fullTank: r.fullTank,
         remark: r.remark ?? '',
       })}
@@ -65,6 +81,7 @@ export function FuelPanel({ carId, visible }: RecordPanelProps) {
         odometerKm: r.odometerKm,
         liters: r.liters,
         price: r.price,
+        reportedConsumption: r.reportedConsumption,
         fullTank: r.fullTank,
         remark: r.remark,
       })}
@@ -81,19 +98,18 @@ export function FuelPanel({ carId, visible }: RecordPanelProps) {
             <input
               type="date"
               value={v.eventDate}
-              onChange={(e) => set({ ...v, eventDate: e.target.value })}
-              required
+              onChange={(e) =>
+                set({ ...v, eventDate: e.target.value, eventDateUnreadable: e.target.validity.badInput })
+              }
             />
           </label>
           <label>
             Odometer (km)
             <input
-              type="number"
-              min="0"
-              step="1"
+              type="text"
+              inputMode="numeric"
               value={v.odometerKm}
               onChange={(e) => set({ ...v, odometerKm: e.target.value })}
-              required
             />
           </label>
           <label>
@@ -103,7 +119,6 @@ export function FuelPanel({ carId, visible }: RecordPanelProps) {
               inputMode="decimal"
               value={v.liters}
               onChange={(e) => set({ ...v, liters: e.target.value })}
-              required
             />
           </label>
           <label>
@@ -113,7 +128,15 @@ export function FuelPanel({ carId, visible }: RecordPanelProps) {
               inputMode="numeric"
               value={v.price}
               onChange={(e) => set({ ...v, price: e.target.value })}
-              required
+            />
+          </label>
+          <label>
+            Reported consumption (L/100 km)
+            <input
+              type="text"
+              inputMode="decimal"
+              value={v.reportedConsumption}
+              onChange={(e) => set({ ...v, reportedConsumption: e.target.value })}
             />
           </label>
           <label className="check">

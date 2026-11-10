@@ -39,19 +39,30 @@ export const fuel = pgTable(
     carId: integer('car_id')
       .notNull()
       .references(() => cars.id, { onDelete: 'restrict' }),
-    eventDate: eventDate(),
+    eventDate: date('event_date', { mode: 'string' }),
     createdAt: createdAt(),
-    odometerKm: integer('odometer_km').notNull(),
-    liters: numeric({ precision: 7, scale: 3, mode: 'number' }).notNull(),
-    price: integer().notNull(),
+    odometerKm: integer('odometer_km'),
+    liters: numeric({ precision: 7, scale: 3, mode: 'number' }),
+    price: integer(),
+    reportedConsumption: numeric('reported_consumption', { precision: 3, scale: 1, mode: 'number' }),
     fullTank: boolean('full_tank').notNull(),
     remark: text(),
   },
   (table) => [
-    index('idx_fuel_car_event_date').on(table.carId, table.eventDate.desc().nullsFirst(), table.id.desc().nullsFirst()),
+    index('idx_fuel_car_event_date').on(
+      table.carId,
+      table.eventDate.desc().nullsLast(),
+      table.odometerKm.desc().nullsLast(),
+      table.id.desc().nullsFirst(),
+    ),
     check('fuel_odometer_km_nonnegative', sql`${table.odometerKm} >= 0`),
     check('fuel_liters_positive', sql`${table.liters} > 0`),
     check('fuel_price_nonnegative', sql`${table.price} >= 0`),
+    check('fuel_reported_consumption_positive', sql`${table.reportedConsumption} > 0`),
+    check(
+      'fuel_has_date_odometer_or_liters',
+      sql`${table.eventDate} IS NOT NULL OR ${table.odometerKm} IS NOT NULL OR ${table.liters} IS NOT NULL`,
+    ),
     check('fuel_remark_length', sql`${table.remark} IS NULL OR char_length(${table.remark}) <= 500`),
   ],
 );
