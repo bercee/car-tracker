@@ -434,7 +434,12 @@ describe('Express API', () => {
       ['year 0000 date', { ...valid, eventDate: '0000-01-01' }, 'eventDate'],
       ['string fullTank', { ...valid, fullTank: 'yes' }, 'fullTank'],
       ['missing fullTank', { ...valid, fullTank: undefined }, 'fullTank'],
-      ['missing liters', { ...valid, liters: undefined }, 'liters'],
+      ['zero reported consumption', { ...valid, reportedConsumption: 0 }, 'reportedConsumption'],
+      ['negative reported consumption', { ...valid, reportedConsumption: -1 }, 'reportedConsumption'],
+      ['too-large reported consumption', { ...valid, reportedConsumption: 100 }, 'reportedConsumption'],
+      ['two-decimal reported consumption', { ...valid, reportedConsumption: 6.55 }, 'reportedConsumption'],
+      ['string reported consumption', { ...valid, reportedConsumption: '6.5' }, 'reportedConsumption'],
+      ['string odometer', { ...valid, odometerKm: '1' }, 'odometerKm'],
       ['too-long remark', { ...valid, remark: 'x'.repeat(501) }, 'remark'],
       ['unknown key', { ...valid, remarks: 'typo' }, 'body'],
       ['array body', [], 'body'],
@@ -447,6 +452,172 @@ describe('Express API', () => {
       expect(rejected.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field });
       await sendJson(request(app).put(`${path()}/${created.body.id}`), body).expect(400);
       expect((await request(app).get(path())).body).toEqual([created.body]);
+    });
+  });
+
+  describe('partial fuel records', () => {
+    const path = () => `/api/cars/${carId}/fuel`;
+    const everyField = [
+      'id',
+      'eventDate',
+      'createdAt',
+      'odometerKm',
+      'liters',
+      'price',
+      'reportedConsumption',
+      'fullTank',
+      'remark',
+    ];
+
+    it.each([
+      ['only a date', { eventDate: '2026-09-15' }],
+      ['only an odometer', { odometerKm: 1000 }],
+      ['only liters', { liters: 40 }],
+      ['date and Price', { eventDate: '2026-09-15', price: 0 }],
+      ['everything but the date', { odometerKm: 1, liters: 1, price: 1, reportedConsumption: 6.5 }],
+    ])('accepts %s and answers with every field, absent ones as null', async (_name, fields) => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const created = await request(app)
+        .post(path())
+        .send({ ...fields, fullTank: false })
+        .expect(201);
+
+      expect(Object.keys(created.body).sort()).toEqual([...everyField].sort());
+      expect(created.body).toMatchObject({
+        eventDate: null,
+        odometerKm: null,
+        liters: null,
+        price: null,
+        reportedConsumption: null,
+        remark: null,
+        ...fields,
+        fullTank: false,
+      });
+      expect((await request(app).get(path())).body).toEqual([created.body]);
+    });
+
+    it('accepts explicit nulls and omitted fields alike', async () => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const nulls = { eventDate: null, odometerKm: 5, liters: null, price: null, reportedConsumption: null };
+      const withNulls = await request(app)
+        .post(path())
+        .send({ ...nulls, fullTank: true })
+        .expect(201);
+      const omitted = await request(app).post(path()).send({ odometerKm: 5, fullTank: true }).expect(201);
+      expect({ ...withNulls.body, id: 0, createdAt: '' }).toEqual({ ...omitted.body, id: 0, createdAt: '' });
+    });
+
+    it.each([
+      ['nothing', {}],
+      ['only a Price', { price: 100 }],
+      ['only a reported consumption', { reportedConsumption: 6.5 }],
+      ['a Price and a reported consumption', { price: 100, reportedConsumption: 6.5 }],
+      ['all three nulled', { eventDate: null, odometerKm: null, liters: null, price: 5 }],
+    ])('rejects %s without a date, odometer or liters', async (_name, fields) => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const body = { ...fields, fullTank: true };
+      const rejected = await request(app).post(path()).send(body).expect(400);
+      expect(rejected.body.error).toEqual({
+        code: 'VALIDATION_ERROR',
+        message: 'Enter at least a date, odometer or liters.',
+        field: 'body',
+      });
+      await request(app).put(`${path()}/1`).send(body).expect(400);
+      expect((await request(app).get(path())).body).toEqual([]);
+    });
+
+    it('round-trips reported consumption boundaries and rejects a missing fullTank', async () => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      for (const reportedConsumption of [0.1, 6.5, 99.9]) {
+        const created = await request(app)
+          .post(path())
+          .send({ odometerKm: 1, reportedConsumption, fullTank: true })
+          .expect(201);
+        expect(created.body.reportedConsumption).toBe(reportedConsumption);
+      }
+      const rejected = await request(app).post(path()).send({ odometerKm: 1 }).expect(400);
+      expect(rejected.body.error).toMatchObject({ field: 'fullTank' });
+    });
+
+    it('clears optional fields on edit and fills them in again', async () => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const created = await request(app)
+        .post(path())
+        .send({
+          eventDate: '2026-09-15',
+          odometerKm: 10,
+          liters: 5,
+          price: 100,
+          reportedConsumption: 7.1,
+          fullTank: true,
+          remark: 'x',
+        })
+        .expect(201);
+
+      const cleared = await request(app)
+        .put(`${path()}/${created.body.id}`)
+        .send({ liters: 5, fullTank: true })
+        .expect(200);
+      expect(cleared.body).toMatchObject({
+        id: created.body.id,
+        createdAt: created.body.createdAt,
+        eventDate: null,
+        odometerKm: null,
+        price: null,
+        reportedConsumption: null,
+        remark: null,
+        liters: 5,
+      });
+
+      const refilled = await request(app)
+        .put(`${path()}/${created.body.id}`)
+        .send({ eventDate: '2026-09-16', reportedConsumption: 6.2, fullTank: false })
+        .expect(200);
+      expect(refilled.body).toMatchObject({ eventDate: '2026-09-16', liters: null, reportedConsumption: 6.2 });
+    });
+
+    it('lists dated records first, then undated by odometer, then the rest newest first', async () => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const records: Record<string, unknown>[] = [
+        { eventDate: '2026-01-01', odometerKm: 100 },
+        { odometerKm: 300 },
+        { liters: 10 },
+        { eventDate: '2026-02-01', odometerKm: 50 },
+        { odometerKm: 200 },
+        { liters: 20 },
+        { eventDate: '2026-02-01', odometerKm: 50 },
+        { eventDate: '2026-02-01' },
+      ];
+      for (const record of records) {
+        await request(app)
+          .post(path())
+          .send({ ...record, fullTank: true })
+          .expect(201);
+      }
+
+      const listed = await request(app).get(path());
+      expect(listed.body.map((record: { id: number }) => record.id)).toEqual([7, 4, 8, 1, 2, 5, 6, 3]);
+    });
+
+    it('keeps AdBlue strict about missing fields', async () => {
+      const app = createApp(testDatabase.database, healthy, logger);
+      const adblue = `/api/cars/${carId}/adblue`;
+      const full = { eventDate: '2026-09-16', odometerKm: 1, liters: 1, price: 1 };
+      for (const field of Object.keys(full)) {
+        const rejected = await request(app)
+          .post(adblue)
+          .send({ ...full, [field]: null })
+          .expect(400);
+        expect(rejected.body.error).toMatchObject({ code: 'VALIDATION_ERROR', field });
+        await request(app)
+          .post(adblue)
+          .send({ ...full, [field]: undefined })
+          .expect(400);
+      }
+      await request(app)
+        .post(adblue)
+        .send({ ...full, reportedConsumption: 6.5 })
+        .expect(400);
     });
   });
 

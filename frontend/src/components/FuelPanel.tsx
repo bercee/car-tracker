@@ -17,7 +17,7 @@ interface FuelForm {
 
 const initial = (): FuelForm => ({
   eventDate: today(),
-  odometerKm: '0',
+  odometerKm: '',
   liters: '',
   price: '',
   fullTank: true,
@@ -26,15 +26,17 @@ const initial = (): FuelForm => ({
 const parse = (form: FuelForm) =>
   parseRequest(fuelRequestSchema, {
     ...form,
+    eventDate: form.eventDate || null,
     odometerKm: numberOf(form.odometerKm),
     liters: numberOf(form.liters),
     price: numberOf(form.price),
+    reportedConsumption: null,
   });
 const columns: RecordTableColumn<FuelRecord>[] = [
-  { header: 'Date', render: (record) => formatDate(record.eventDate) },
-  { header: 'Odometer', render: (record) => record.odometerKm.toLocaleString() },
-  { header: 'Liters', render: (record) => formatLiters(record.liters) },
-  { header: 'Total price', render: (record) => formatMoney(record.price) },
+  { header: 'Date', render: (record) => (record.eventDate === null ? '—' : formatDate(record.eventDate)) },
+  { header: 'Odometer', render: (record) => record.odometerKm?.toLocaleString() ?? '—' },
+  { header: 'Liters', render: (record) => (record.liters === null ? '—' : formatLiters(record.liters)) },
+  { header: 'Total price', render: (record) => (record.price === null ? '—' : formatMoney(record.price)) },
   { header: 'Full tank', render: (record) => (record.fullTank ? 'Yes' : 'No') },
   { header: 'Remark', render: (record) => record.remark ?? '—' },
 ];
@@ -53,10 +55,10 @@ export function FuelPanel({ carId, visible }: RecordPanelProps) {
       update={update}
       remove={remove}
       toFormValue={(r) => ({
-        eventDate: r.eventDate,
-        odometerKm: String(r.odometerKm),
-        liters: String(r.liters),
-        price: String(r.price),
+        eventDate: r.eventDate ?? '',
+        odometerKm: r.odometerKm === null ? '' : String(r.odometerKm),
+        liters: r.liters === null ? '' : String(r.liters),
+        price: r.price === null ? '' : String(r.price),
         fullTank: r.fullTank,
         remark: r.remark ?? '',
       })}
@@ -65,6 +67,7 @@ export function FuelPanel({ carId, visible }: RecordPanelProps) {
         odometerKm: r.odometerKm,
         liters: r.liters,
         price: r.price,
+        reportedConsumption: r.reportedConsumption,
         fullTank: r.fullTank,
         remark: r.remark,
       })}

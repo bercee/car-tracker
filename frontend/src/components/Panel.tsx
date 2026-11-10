@@ -24,7 +24,7 @@ const verbs = {
 };
 type Verb = keyof typeof verbs;
 
-const describe = (action: RecordAction) => `${action.label} from ${action.eventDate}`;
+const describe = (action: RecordAction) => `${action.label} from ${action.eventDate ?? 'an undated Record'}`;
 
 // Failures that can go away by themselves keep the Record action for a retry; any other API failure drops it.
 const transientFailures: ApiErrorKind[] = ['network', 'database-unavailable'];
@@ -43,7 +43,7 @@ export interface PanelActions<Rec> {
   disabled: boolean;
 }
 
-export interface PanelProps<Form, Request extends { eventDate: string }, Rec extends { id: number }> {
+export interface PanelProps<Form, Request extends { eventDate?: string | null }, Rec extends { id: number }> {
   title: string;
   visible: boolean;
   load: () => Promise<Rec[]>;
@@ -59,7 +59,7 @@ export interface PanelProps<Form, Request extends { eventDate: string }, Rec ext
   table: (records: Rec[], actions: PanelActions<Rec>) => ReactNode;
 }
 
-export function Panel<Form, Request extends { eventDate: string }, Rec extends { id: number }>({
+export function Panel<Form, Request extends { eventDate?: string | null }, Rec extends { id: number }>({
   title,
   visible,
   load,

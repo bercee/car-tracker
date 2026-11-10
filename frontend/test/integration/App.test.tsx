@@ -47,6 +47,7 @@ const fuelRow = (id: number, remark: string) => ({
   odometerKm: 10 * id,
   liters: 1,
   price: 619,
+  reportedConsumption: null,
   fullTank: true,
   remark,
 });
@@ -207,8 +208,9 @@ describe('App', () => {
       if (text !== '') await user.type(screen.getByLabelText(label), text);
     };
 
+    await fill('Date', '');
     await fill('Total price (HUF)', '619');
-    expect(await save()).toHaveTextContent('liters');
+    expect(await save()).toHaveTextContent('Enter at least a date, odometer or liters.');
     await fill('Liters', '0');
     expect(await save()).toHaveTextContent('liters');
     await fill('Liters', '10000');
@@ -216,14 +218,10 @@ describe('App', () => {
     await fill('Liters', '1e3');
     expect(await save()).toHaveTextContent('liters');
     await fill('Liters', '5');
-    await fill('Total price (HUF)', '');
-    expect(await save()).toHaveTextContent('HUF price');
     await fill('Total price (HUF)', '10000000');
     expect(await save()).toHaveTextContent('HUF price');
     await fill('Total price (HUF)', '619');
     await fill('Odometer (km)', '-1');
-    expect(await save()).toHaveTextContent('odometer');
-    await fill('Odometer (km)', '');
     expect(await save()).toHaveTextContent('odometer');
     expect(api.addFuel).not.toHaveBeenCalled();
   });
@@ -360,9 +358,10 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
     expect(api.addFuel).toHaveBeenCalledWith(1, {
       eventDate: expect.any(String),
-      odometerKm: 0,
+      odometerKm: null,
       liters: 47.3,
       price: 29_284,
+      reportedConsumption: null,
       fullTank: false,
       remark: 'Shell',
     });
@@ -426,6 +425,7 @@ describe('App', () => {
         odometerKm: 123,
         liters: 12.3,
         price: 4567,
+        reportedConsumption: null,
         fullTank: false,
         remark: 'Station',
       },
@@ -450,6 +450,7 @@ describe('App', () => {
         odometerKm: 123,
         liters: 12.3,
         price: 4567,
+        reportedConsumption: null,
         fullTank: false,
         remark: 'Updated',
       }),
@@ -1073,6 +1074,7 @@ describe('App', () => {
           odometerKm: 80,
           liters: 1,
           price: 619,
+          reportedConsumption: null,
           fullTank: true,
           remark: 'Station',
         }),

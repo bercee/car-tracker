@@ -9,7 +9,7 @@ export interface RecordAction {
   /** What the action did, for example "edit of Fuel record". */
   label: string;
   /** The event date of the Record the action acted on. */
-  eventDate: string;
+  eventDate: string | null | undefined;
   reverse: (recordId: number) => Promise<void | number>;
   reapply: (recordId: number) => Promise<void | number>;
 }

@@ -22,6 +22,7 @@ export function mapFuelRow(row: FuelRow): FuelRecord {
     odometerKm: row.odometerKm,
     liters: row.liters,
     price: row.price,
+    reportedConsumption: row.reportedConsumption,
     fullTank: row.fullTank,
     remark: row.remark,
   };

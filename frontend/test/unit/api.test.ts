@@ -30,7 +30,15 @@ describe('api client', () => {
       expect.objectContaining({ headers: { Accept: 'application/json' } }),
     );
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ id: 1 }), { status: 201 }));
-    await addFuel(3, { eventDate: '2026-09-18', odometerKm: 1, liters: 1, price: 1, fullTank: false, remark: null });
+    await addFuel(3, {
+      eventDate: '2026-09-18',
+      odometerKm: 1,
+      liters: 1,
+      price: 1,
+      reportedConsumption: null,
+      fullTank: false,
+      remark: null,
+    });
     expect(fetchMock).toHaveBeenLastCalledWith(
       '/api/cars/3/fuel',
       expect.objectContaining({

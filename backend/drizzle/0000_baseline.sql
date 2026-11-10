@@ -32,16 +32,19 @@ CREATE TABLE "expenses" (
 CREATE TABLE "fuel" (
 	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "fuel_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"car_id" integer NOT NULL,
-	"event_date" date NOT NULL,
+	"event_date" date,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"odometer_km" integer NOT NULL,
-	"liters" numeric(7, 3) NOT NULL,
-	"price" integer NOT NULL,
+	"odometer_km" integer,
+	"liters" numeric(7, 3),
+	"price" integer,
+	"reported_consumption" numeric(4, 1),
 	"full_tank" boolean NOT NULL,
 	"remark" text,
 	CONSTRAINT "fuel_odometer_km_nonnegative" CHECK ("fuel"."odometer_km" >= 0),
 	CONSTRAINT "fuel_liters_positive" CHECK ("fuel"."liters" > 0),
 	CONSTRAINT "fuel_price_nonnegative" CHECK ("fuel"."price" >= 0),
+	CONSTRAINT "fuel_reported_consumption_positive" CHECK ("fuel"."reported_consumption" > 0),
+	CONSTRAINT "fuel_has_date_odometer_or_liters" CHECK ("fuel"."event_date" IS NOT NULL OR "fuel"."odometer_km" IS NOT NULL OR "fuel"."liters" IS NOT NULL),
 	CONSTRAINT "fuel_remark_length" CHECK ("fuel"."remark" IS NULL OR char_length("fuel"."remark") <= 500)
 );
 --> statement-breakpoint
@@ -51,4 +54,4 @@ ALTER TABLE "fuel" ADD CONSTRAINT "fuel_car_id_cars_id_fk" FOREIGN KEY ("car_id"
 CREATE INDEX "idx_adblue_car_event_date" ON "adblue" USING btree ("car_id","event_date" DESC NULLS FIRST,"id" DESC NULLS FIRST);--> statement-breakpoint
 CREATE UNIQUE INDEX "cars_name_lower_key" ON "cars" USING btree (lower("name" COLLATE "C"));--> statement-breakpoint
 CREATE INDEX "idx_expenses_car_event_date" ON "expenses" USING btree ("car_id","event_date" DESC NULLS FIRST,"id" DESC NULLS FIRST);--> statement-breakpoint
-CREATE INDEX "idx_fuel_car_event_date" ON "fuel" USING btree ("car_id","event_date" DESC NULLS FIRST,"id" DESC NULLS FIRST);
+CREATE INDEX "idx_fuel_car_event_date" ON "fuel" USING btree ("car_id","event_date" DESC NULLS LAST,"odometer_km" DESC NULLS LAST,"id" DESC NULLS FIRST);

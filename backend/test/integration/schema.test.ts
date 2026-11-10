@@ -70,6 +70,7 @@ describe('baseline migration on an empty PostgreSQL database', () => {
       expect(typeOf(table, 'event_date')).toBe('date');
       expect(typeOf(table, 'created_at')).toBe('timestamp with time zone');
     }
+    expect(typeOf('fuel', 'reported_consumption')).toBe('numeric');
     for (const table of ['fuel', 'adblue']) {
       expect(typeOf(table, 'odometer_km')).toBe('integer');
       expect(typeOf(table, 'liters')).toBe('numeric');
@@ -132,6 +133,50 @@ describe('baseline migration on an empty PostgreSQL database', () => {
     await expectViolation(insertFuel, withValue(6, 'x'.repeat(501)), '23514');
     await expect(client.query(insertFuel, withValue(6, 'x'.repeat(500)))).resolves.toMatchObject({ rowCount: 1 });
     await expect(client.query(insertFuel, withValue(4, 0))).resolves.toMatchObject({ rowCount: 1 });
+  });
+
+  it('makes the fuel date, odometer, liters, Price and reported consumption nullable, but not the others', async () => {
+    const nullability = await client.query<{ table_name: string; column_name: string; is_nullable: string }>(
+      `SELECT table_name, column_name, is_nullable FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name IN ('fuel', 'adblue', 'expenses')`,
+    );
+    const nullable = (table: string, column: string) =>
+      nullability.rows.find((row) => row.table_name === table && row.column_name === column)?.is_nullable === 'YES';
+
+    for (const column of ['event_date', 'odometer_km', 'liters', 'price', 'reported_consumption', 'remark']) {
+      expect(nullable('fuel', column), column).toBe(true);
+    }
+    for (const column of ['car_id', 'full_tank', 'created_at']) {
+      expect(nullable('fuel', column), column).toBe(false);
+    }
+    for (const column of ['event_date', 'odometer_km', 'liters', 'price']) {
+      expect(nullable('adblue', column), column).toBe(false);
+    }
+    expect(nullable('expenses', 'event_date')).toBe(false);
+  });
+
+  it('enforces the fuel presence and reported consumption CHECKs', async () => {
+    const carId = await insertCar('Partial fuel');
+    const insertFuel = `INSERT INTO fuel
+      (car_id, event_date, odometer_km, liters, price, reported_consumption, full_tank)
+      VALUES ($1, $2, $3, $4, $5, $6, true)`;
+
+    await expectViolation(insertFuel, [carId, null, null, null, 100, 6.5], '23514');
+    await expectViolation(insertFuel, [carId, null, null, null, null, null], '23514');
+    for (const present of [
+      [carId, '2026-09-17', null, null, null, null],
+      [carId, null, 0, null, null, null],
+      [carId, null, null, 0.001, null, null],
+    ]) {
+      await expect(client.query(insertFuel, present)).resolves.toMatchObject({ rowCount: 1 });
+    }
+
+    const withConsumption = (value: number) => [carId, null, 1, null, null, value];
+    await expectViolation(insertFuel, withConsumption(0), '23514');
+    await expectViolation(insertFuel, withConsumption(-1), '23514');
+    await expectViolation(insertFuel, withConsumption(1000), '22003');
+    await expect(client.query(insertFuel, withConsumption(999.9))).resolves.toMatchObject({ rowCount: 1 });
+    await expect(client.query(insertFuel, withConsumption(0.1))).resolves.toMatchObject({ rowCount: 1 });
   });
 
   it('enforces the AdBlue CHECKs', async () => {
@@ -198,7 +243,7 @@ describe('baseline migration on an empty PostgreSQL database', () => {
     await expect(client.query('DELETE FROM cars WHERE id = $1', [carId])).resolves.toMatchObject({ rowCount: 1 });
   });
 
-  it('recreates the three (car_id, event_date DESC, id DESC) indexes', async () => {
+  it('recreates the listing indexes, with fuel also ordered by odometer and undated rows last', async () => {
     const indexes = await client.query<{ tablename: string; indexdef: string }>(
       `SELECT tablename, indexdef FROM pg_indexes
        WHERE schemaname = 'public' AND tablename IN ('fuel', 'adblue', 'expenses')
@@ -206,7 +251,11 @@ describe('baseline migration on an empty PostgreSQL database', () => {
     );
     expect(indexes.rows.map((row) => row.tablename).sort()).toEqual(['adblue', 'expenses', 'fuel']);
     for (const row of indexes.rows) {
-      expect(row.indexdef).toMatch(/\(car_id, event_date DESC, id DESC\)/);
+      const expected =
+        row.tablename === 'fuel'
+          ? /\(car_id, event_date DESC NULLS LAST, odometer_km DESC NULLS LAST, id DESC\)/
+          : /\(car_id, event_date DESC, id DESC\)/;
+      expect(row.indexdef).toMatch(expected);
     }
   });
 });
