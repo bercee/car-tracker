@@ -24,7 +24,8 @@ const verbs = {
 };
 type Verb = keyof typeof verbs;
 
-const describe = (action: RecordAction) => `${action.label} from ${action.eventDate ?? 'an undated Record'}`;
+const describe = (action: RecordAction) =>
+  action.eventDate ? `${action.label} from ${action.eventDate}` : `${action.label} (undated)`;
 
 // Failures that can go away by themselves keep the Record action for a retry; any other API failure drops it.
 const transientFailures: ApiErrorKind[] = ['network', 'database-unavailable'];

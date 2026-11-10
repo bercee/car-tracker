@@ -35,6 +35,7 @@ const api = vi.hoisted(() => {
 });
 vi.mock('../../src/api', () => api);
 import { App } from '../../src/App';
+import type { FuelRecord } from '@car-tracker/contracts';
 import { formatMoney } from '../../src/format';
 
 const cars = [
@@ -150,6 +151,7 @@ describe('App', () => {
         odometerKm: 1,
         liters: 1,
         price: 619,
+        reportedConsumption: 6.4,
         fullTank: true,
         remark: null,
       },
@@ -159,6 +161,7 @@ describe('App', () => {
         odometerKm: 2,
         liters: 2,
         price: 620,
+        reportedConsumption: 5.8,
         fullTank: false,
         remark: 'Station',
       },
@@ -369,6 +372,138 @@ describe('App', () => {
     await waitFor(() => expect(panel('Fuel').getByRole('status')).toHaveTextContent('Fuel record saved.'));
     expect(screen.getByLabelText('Liters')).toHaveValue('');
   });
+  describe('partial Fuel Records', () => {
+    const partialRow: FuelRecord = {
+      id: 12,
+      createdAt: '',
+      eventDate: null,
+      odometerKm: 150_000,
+      liters: null,
+      price: null,
+      reportedConsumption: 6.4,
+      fullTank: true,
+      remark: null,
+    };
+
+    const requestOf = (row: FuelRecord, changes: Partial<FuelRecord> = {}) => {
+      const request: Partial<FuelRecord> = { ...row, ...changes };
+      delete request.id;
+      delete request.createdAt;
+      return request;
+    };
+
+    it('defaults the date to today, starts the other fields blank and keeps full tank checked', async () => {
+      defaults();
+      render(<App />);
+      await screen.findByText('No records yet.');
+      expect(screen.getByLabelText('Date')).toHaveValue(new Date().toLocaleDateString('en-CA'));
+      for (const label of ['Odometer (km)', 'Liters', 'Total price (HUF)', 'Reported consumption (L/100 km)']) {
+        expect(screen.getByLabelText(label)).toHaveValue(label === 'Odometer (km)' ? null : '');
+        expect(screen.getByLabelText(label)).not.toBeRequired();
+      }
+      expect(screen.getByLabelText('Date')).not.toBeRequired();
+      expect(screen.getByLabelText('Full tank')).toBeChecked();
+    });
+
+    it('sends blank fields as null and a cleared date as an undated Record', async () => {
+      defaults();
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByText('No records yet.');
+      await user.clear(screen.getByLabelText('Date'));
+      await user.type(screen.getByLabelText('Odometer (km)'), '150000');
+      await user.type(screen.getByLabelText('Reported consumption (L/100 km)'), '6.4');
+      await user.click(screen.getByRole('button', { name: 'Save record' }));
+      await waitFor(() =>
+        expect(api.addFuel).toHaveBeenCalledWith(1, {
+          eventDate: null,
+          odometerKm: 150_000,
+          liters: null,
+          price: null,
+          reportedConsumption: 6.4,
+          fullTank: true,
+          remark: null,
+        }),
+      );
+    });
+
+    it('asks for at least a date, odometer or liters when only Price or Reported consumption is filled', async () => {
+      defaults();
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByText('No records yet.');
+      await user.clear(screen.getByLabelText('Date'));
+      await user.type(screen.getByLabelText('Total price (HUF)'), '619');
+      await user.type(screen.getByLabelText('Reported consumption (L/100 km)'), '6.4');
+      await user.click(screen.getByRole('button', { name: 'Save record' }));
+      expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent(
+        'Enter at least a date, odometer or liters.',
+      );
+      expect(api.addFuel).not.toHaveBeenCalled();
+    });
+
+    it.each(['0', '-1', '100', '6.45', '1e1'])('rejects the Reported consumption %s', async (text) => {
+      defaults();
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByText('No records yet.');
+      await user.type(screen.getByLabelText('Reported consumption (L/100 km)'), text);
+      await user.click(screen.getByRole('button', { name: 'Save record' }));
+      expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('reported consumption above 0');
+      expect(api.addFuel).not.toHaveBeenCalled();
+    });
+
+    it('shows the Reported L/100 km column and a dash for every blank value', async () => {
+      defaults();
+      api.getFuel.mockResolvedValue([partialRow]);
+      render(<App />);
+      const row = (await screen.findByText('150,000')).closest('tr')!;
+      expect(panel('Fuel').getByRole('columnheader', { name: 'Reported L/100 km' })).toBeInTheDocument();
+      const cells = within(row).getAllByRole('cell');
+      const headers = panel('Fuel')
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent);
+      const cell = (header: string) => cells[headers.indexOf(header)]!;
+      expect(cell('Reported L/100 km')).toHaveTextContent('6.4');
+      for (const header of ['Date', 'Liters', 'Total price', 'Remark']) expect(cell(header)).toHaveTextContent('—');
+    });
+
+    it('fills in and clears optional fields when editing, and undoes and redoes the edit', async () => {
+      defaults();
+      api.getFuel.mockResolvedValue([partialRow]);
+      const user = userEvent.setup();
+      render(<App />);
+      await user.click(await screen.findByRole('button', { name: 'Edit Fuel record 12' }));
+      expect(screen.getByLabelText('Date')).toHaveValue('');
+      expect(screen.getByLabelText('Liters')).toHaveValue('');
+      expect(screen.getByLabelText('Reported consumption (L/100 km)')).toHaveValue('6.4');
+
+      await user.type(screen.getByLabelText('Liters'), '40.5');
+      await user.clear(screen.getByLabelText('Reported consumption (L/100 km)'));
+      await user.click(screen.getByRole('button', { name: 'Update record' }));
+      const editedRequest = requestOf(partialRow, { liters: 40.5, reportedConsumption: null });
+      const originalRequest = requestOf(partialRow);
+      await waitFor(() => expect(api.updateFuel).toHaveBeenCalledWith(1, 12, editedRequest));
+
+      const undoName = 'Undo edit of Fuel record (undated)';
+      await user.click(await panel('Fuel').findByRole('button', { name: undoName }));
+      await waitFor(() => expect(api.updateFuel).toHaveBeenLastCalledWith(1, 12, originalRequest));
+      await user.click(await panel('Fuel').findByRole('button', { name: 'Redo edit of Fuel record (undated)' }));
+      await waitFor(() => expect(api.updateFuel).toHaveBeenLastCalledWith(1, 12, editedRequest));
+    });
+
+    it('re-creates a deleted partial Record with its blanks and Reported consumption', async () => {
+      defaults();
+      api.getFuel.mockResolvedValue([partialRow]);
+      api.addFuel.mockResolvedValue({ ...partialRow, id: 13 });
+      const user = userEvent.setup();
+      render(<App />);
+      await user.click(await screen.findByRole('button', { name: 'Delete Fuel record 12' }));
+      await user.click(await panel('Fuel').findByRole('button', { name: 'Undo delete of Fuel record (undated)' }));
+      await waitFor(() => expect(api.addFuel).toHaveBeenCalledWith(1, requestOf(partialRow)));
+    });
+  });
+
   it('preserves input after a save failure', async () => {
     defaults();
     api.addExpense.mockRejectedValue(new Error('offline'));
