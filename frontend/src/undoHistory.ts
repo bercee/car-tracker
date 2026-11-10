@@ -8,7 +8,10 @@ export interface RecordAction {
   recordId: number;
   /** What the action did, for example "edit of Fuel record". */
   label: string;
-  /** The event date of the Record the action acted on. */
+  /**
+   * The event date of the Record the action acted on. null means an undated Fuel Record (ADR 0007);
+   * undefined is allowed for Record kinds without a date to show in the label.
+   */
   eventDate: string | null | undefined;
   reverse: (recordId: number) => Promise<void | number>;
   reapply: (recordId: number) => Promise<void | number>;

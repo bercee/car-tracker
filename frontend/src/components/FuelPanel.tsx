@@ -8,6 +8,8 @@ import { RecordTable, type RecordTableColumn } from './RecordTable';
 
 interface FuelForm {
   eventDate: string;
+  // A partly typed date reports value "" like a cleared one; only validity.badInput tells them apart.
+  eventDateUnreadable: boolean;
   odometerKm: string;
   liters: string;
   price: string;
@@ -18,6 +20,7 @@ interface FuelForm {
 
 const initial = (): FuelForm => ({
   eventDate: today(),
+  eventDateUnreadable: false,
   odometerKm: '',
   liters: '',
   price: '',
@@ -26,14 +29,17 @@ const initial = (): FuelForm => ({
   remark: '',
 });
 const parse = (form: FuelForm) =>
-  parseRequest(fuelRequestSchema, {
-    ...form,
-    eventDate: form.eventDate || null,
-    odometerKm: numberOf(form.odometerKm) ?? null,
-    liters: numberOf(form.liters) ?? null,
-    price: numberOf(form.price) ?? null,
-    reportedConsumption: numberOf(form.reportedConsumption) ?? null,
-  });
+  form.eventDateUnreadable
+    ? { error: 'Enter a complete date, or clear the date field.' }
+    : parseRequest(fuelRequestSchema, {
+        fullTank: form.fullTank,
+        remark: form.remark,
+        eventDate: form.eventDate || null,
+        odometerKm: numberOf(form.odometerKm) ?? null,
+        liters: numberOf(form.liters) ?? null,
+        price: numberOf(form.price) ?? null,
+        reportedConsumption: numberOf(form.reportedConsumption) ?? null,
+      });
 const columns: RecordTableColumn<FuelRecord>[] = [
   { header: 'Date', render: (record) => (record.eventDate === null ? '—' : formatDate(record.eventDate)) },
   { header: 'Odometer', render: (record) => record.odometerKm?.toLocaleString() ?? '—' },
@@ -62,6 +68,7 @@ export function FuelPanel({ carId, visible }: RecordPanelProps) {
       remove={remove}
       toFormValue={(r) => ({
         eventDate: r.eventDate ?? '',
+        eventDateUnreadable: false,
         odometerKm: r.odometerKm === null ? '' : String(r.odometerKm),
         liters: r.liters === null ? '' : String(r.liters),
         price: r.price === null ? '' : String(r.price),
@@ -88,14 +95,19 @@ export function FuelPanel({ carId, visible }: RecordPanelProps) {
         <>
           <label>
             Date
-            <input type="date" value={v.eventDate} onChange={(e) => set({ ...v, eventDate: e.target.value })} />
+            <input
+              type="date"
+              value={v.eventDate}
+              onChange={(e) =>
+                set({ ...v, eventDate: e.target.value, eventDateUnreadable: e.target.validity.badInput })
+              }
+            />
           </label>
           <label>
             Odometer (km)
             <input
-              type="number"
-              min="0"
-              step="1"
+              type="text"
+              inputMode="numeric"
               value={v.odometerKm}
               onChange={(e) => set({ ...v, odometerKm: e.target.value })}
             />

@@ -37,7 +37,7 @@ CREATE TABLE "fuel" (
 	"odometer_km" integer,
 	"liters" numeric(7, 3),
 	"price" integer,
-	"reported_consumption" numeric(4, 1),
+	"reported_consumption" numeric(3, 1),
 	"full_tank" boolean NOT NULL,
 	"remark" text,
 	CONSTRAINT "fuel_odometer_km_nonnegative" CHECK ("fuel"."odometer_km" >= 0),

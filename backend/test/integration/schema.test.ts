@@ -71,6 +71,11 @@ describe('baseline migration on an empty PostgreSQL database', () => {
       expect(typeOf(table, 'created_at')).toBe('timestamp with time zone');
     }
     expect(typeOf('fuel', 'reported_consumption')).toBe('numeric');
+    const consumption = await client.query<{ numeric_precision: number; numeric_scale: number }>(
+      `SELECT numeric_precision, numeric_scale FROM information_schema.columns
+       WHERE table_name = 'fuel' AND column_name = 'reported_consumption'`,
+    );
+    expect(consumption.rows[0]).toEqual({ numeric_precision: 3, numeric_scale: 1 });
     for (const table of ['fuel', 'adblue']) {
       expect(typeOf(table, 'odometer_km')).toBe('integer');
       expect(typeOf(table, 'liters')).toBe('numeric');
@@ -174,8 +179,8 @@ describe('baseline migration on an empty PostgreSQL database', () => {
     const withConsumption = (value: number) => [carId, null, 1, null, null, value];
     await expectViolation(insertFuel, withConsumption(0), '23514');
     await expectViolation(insertFuel, withConsumption(-1), '23514');
-    await expectViolation(insertFuel, withConsumption(1000), '22003');
-    await expect(client.query(insertFuel, withConsumption(999.9))).resolves.toMatchObject({ rowCount: 1 });
+    await expectViolation(insertFuel, withConsumption(100), '22003');
+    await expect(client.query(insertFuel, withConsumption(99.9))).resolves.toMatchObject({ rowCount: 1 });
     await expect(client.query(insertFuel, withConsumption(0.1))).resolves.toMatchObject({ rowCount: 1 });
   });
 

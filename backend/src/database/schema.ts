@@ -44,7 +44,7 @@ export const fuel = pgTable(
     odometerKm: integer('odometer_km'),
     liters: numeric({ precision: 7, scale: 3, mode: 'number' }),
     price: integer(),
-    reportedConsumption: numeric('reported_consumption', { precision: 4, scale: 1, mode: 'number' }),
+    reportedConsumption: numeric('reported_consumption', { precision: 3, scale: 1, mode: 'number' }),
     fullTank: boolean('full_tank').notNull(),
     remark: text(),
   },

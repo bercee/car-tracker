@@ -1,10 +1,10 @@
 # Fuel Records may be partial
 
-A Fuel Record needs at least one of a date, an odometer reading or liters. Everything else, Price included, may be blank and is stored as NULL, never as zero. The rule is enforced three times: a refinement on the shared Zod request schema (message "Enter at least a date, odometer or liters."), the Panel form, and a CHECK constraint in Postgres, so no client or script can bypass it. AdBlue and Expenses Records keep requiring all their fields.
+A Fuel Record needs at least one of a date, an odometer reading or liters. Everything else, Price included, may be blank and is stored as NULL, never as zero. The rule is enforced in two layers: a refinement on the shared Zod request schema (message "Enter at least a date, odometer or liters."), which both the Panel form and the API run, and a CHECK constraint in Postgres, so no client or script can bypass it. AdBlue and Expenses Records keep requiring all their fields.
 
 We need this because a Car's history can arrive with no dates, and a fill-up is sometimes only partly known. The alternative was to make the user invent values or drop what they do know. Those three fields are the ones that can place or size a fill-up. A Record with only a Price or only a Reported consumption cannot be placed in the Car's history or used for any consumption figure, so it is rejected.
 
-A Fuel Record can also hold a Reported consumption, the L/100 km the car computer showed. It is stored as `numeric(4,1)`, read as a JS number, with a CHECK that it is above zero. Its largest value is 99.9, so a JS double holds it exactly, as ADR 0004 argues for liters and Price.
+A Fuel Record can also hold a Reported consumption, the L/100 km the car computer showed. It is stored as `numeric(3,1)`, read as a JS number, with a CHECK that it is above zero. The `numeric(3,1)` type bounds it to 99.9, so a JS double holds it exactly, as ADR 0004 argues for liters and Price.
 
 ## Considered options
 

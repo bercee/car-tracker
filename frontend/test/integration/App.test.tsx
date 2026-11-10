@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -398,7 +398,7 @@ describe('App', () => {
       await screen.findByText('No records yet.');
       expect(screen.getByLabelText('Date')).toHaveValue(new Date().toLocaleDateString('en-CA'));
       for (const label of ['Odometer (km)', 'Liters', 'Total price (HUF)', 'Reported consumption (L/100 km)']) {
-        expect(screen.getByLabelText(label)).toHaveValue(label === 'Odometer (km)' ? null : '');
+        expect(screen.getByLabelText(label)).toHaveValue('');
         expect(screen.getByLabelText(label)).not.toBeRequired();
       }
       expect(screen.getByLabelText('Date')).not.toBeRequired();
@@ -440,6 +440,38 @@ describe('App', () => {
         'Enter at least a date, odometer or liters.',
       );
       expect(api.addFuel).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unparsable odometer instead of saving it as blank', async () => {
+      defaults();
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByText('No records yet.');
+      await user.type(screen.getByLabelText('Odometer (km)'), '12abc');
+      await user.click(screen.getByRole('button', { name: 'Save record' }));
+      expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('odometer');
+      expect(api.addFuel).not.toHaveBeenCalled();
+    });
+
+    it('blocks saving a partly typed date but still saves a cleared one as undated', async () => {
+      defaults();
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByText('No records yet.');
+      const date = screen.getByLabelText('Date');
+      await user.type(screen.getByLabelText('Odometer (km)'), '150000');
+      // jsdom drops unparsable date text, so the browser's badInput state is simulated.
+      Object.defineProperty(date, 'validity', { configurable: true, value: { badInput: true } });
+      fireEvent.change(date, { target: { value: '' } });
+      await user.click(screen.getByRole('button', { name: 'Save record' }));
+      expect((await screen.findAllByRole('alert')).at(-1)).toHaveTextContent('complete date');
+      expect(api.addFuel).not.toHaveBeenCalled();
+
+      Object.defineProperty(date, 'validity', { configurable: true, value: { badInput: false } });
+      fireEvent.change(date, { target: { value: '2026-01-02' } });
+      await user.clear(date);
+      await user.click(screen.getByRole('button', { name: 'Save record' }));
+      await waitFor(() => expect(api.addFuel).toHaveBeenCalledWith(1, expect.objectContaining({ eventDate: null })));
     });
 
     it.each(['0', '-1', '100', '6.45', '1e1'])('rejects the Reported consumption %s', async (text) => {
@@ -571,7 +603,7 @@ describe('App', () => {
     await screen.findByRole('button', { name: 'Edit Fuel record 8' });
     await user.click(screen.getByRole('button', { name: 'Edit Fuel record 8' }));
     expect(panel('Fuel').getByRole('group')).toHaveTextContent('Edit fuel record');
-    expect(screen.getByLabelText('Odometer (km)')).toHaveValue(123);
+    expect(screen.getByLabelText('Odometer (km)')).toHaveValue('123');
     expect(screen.getByLabelText('Liters')).toHaveValue('12.3');
     expect(screen.getByLabelText('Total price (HUF)')).toHaveValue('4567');
     expect(screen.getByLabelText('Full tank')).not.toBeChecked();
